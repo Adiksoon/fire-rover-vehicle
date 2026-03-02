@@ -1,4 +1,4 @@
-# Fire Rover Team
+# Autonomous Tracked Vehicle
 
 Projekt zespolowy: autonomiczny robot mobilny (gasienicowy) do mapowania otoczenia i dojazdu do celu oznaczonego markerem ArUco.
 
