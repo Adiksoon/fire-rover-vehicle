@@ -15,7 +15,7 @@ Zakres pracy obejmuje:
 ## 3. Software
 ### Część programowa
 - konfiguracja środowiska ROS2,
-- implementacja mapowania (SLAM),
+- implementacja mapowania (SLAM)
 - lokalizacja robota,
 - planowanie trasy przejazdu,
 - detekcja celu przy użyciu kamery,
@@ -33,7 +33,7 @@ Zakres pracy obejmuje:
 
 ## 4. Dzialanie systemu
 ### Start - Lokalizacja celu
-Robot po uruchomieniu dokonuje skanowania otoczenia i tworzy mape otoczenia. Po wykryciu markera określana jest jego pozycja względem robota oraz wyznaczany jest punkt celu na mapie. Następnie system planowania trasy wyznacza bezkolizyjną ścieżkę przejazdu z uwzględnieniem przeszkód znajdujących się w otoczeniu.
+Robot po uruchomieniu dokonuje skanowania otoczenia i tworzy mape otoczenia rozpoczyna szukanie znacznika. Po wykryciu markera określana jest jego pozycja względem robota oraz wyznaczany jest punkt celu na mapie. Następnie system planowania trasy wyznacza bezkolizyjną ścieżkę przejazdu z uwzględnieniem przeszkód znajdujących się w otoczeniu.
 ### W trakcie dzialania
 Robot na bieżąco estymuje swoją pozycję na podstawie odometrii i danych z czujników. System sterowania porównuje aktualną pozycję z zaplanowaną trajektorią i koryguje ruch robota. W przypadku pojawienia się przeszkód planowana jest lokalna korekta trasy.
 ### Koniec
@@ -41,3 +41,5 @@ Robot dojezdza i zatrzymuje sie przy celu
 
 ### Ograniczenia projektu
 Robot przeznaczony jest do pracy w środowisku wewnętrznym (np. sala, korytarz, hala) o utwardzonej nawierzchni. Konstrukcja nie jest przystosowana do pracy na zewnątrz ani w trudnych warunkach terenowych.
+
+
