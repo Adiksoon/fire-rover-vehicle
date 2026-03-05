@@ -72,7 +72,6 @@
 | **Ethernet CAT6 2m (debug)** | 1 | [-] | https://pl.aliexpress.com/item/1005009121518528.html | ~8 | Jetson ↔ PC |
 | **Powered USB Hub (zasilany)** | 1 | 5V | WYMAGANIA: aktywny hub 4-port, zasilacz/5V in | ~40–80 | zwykle potrzebny (LiDAR + debug) |
 | **Przewody silikonowe do silników (15AWG)** | 2–3 m | [-] | LINK_WIRE | ~20/m | zasilanie napędu, skręcać pary |
-| **Przewody sygnałowe (22–26AWG)** | 5–10 m | [-] | WYMAGANIA: przewód wielożyłowy, elastyczny | ~20–40 | enkodery, I2C, GPIO |
 | **Złącza JST‑XH / JST‑PH (zestaw)** | 1 | [-] | WYMAGANIA: komplet wtyk+gniazdo + piny + zaciskarka (opcjonalnie) | ~30–80 | bardzo ułatwia porządek w kablach |
 | **Koszulki termokurczliwe (zestaw)** | 1 | [-] | lokalnie | ~10–20 | izolacja |
 | **Opaski zaciskowe (trytytki) + rzepy** | 1 kpl. | [-] | lokalnie | ~10–20 | organizacja przewodów |
@@ -92,7 +91,7 @@
 
 ---
 
-## 8. SPARES / SERWIS (opcjonalne, ale polecam)
+## 8. SPARES / SERWIS
 | MODEL | ILOŚĆ | UWAGI |
 | :-- | :--: | :-- |
 | Zapasowe bezpieczniki (ATO/ANL) | 1 kpl. | zawsze schodzą na testach |
@@ -101,16 +100,8 @@
 
 ---
 
-## 9. TODO — pola do uzupełnienia linkami
-- LINK_LADOWARKA
-- LINK_PRZETWORNICA (zastąpione przez 2 przetwornice: 5V 10A + 5V 3A)
-- LINK_WIRE
-- LINK_STANDOFF
-- LINK_SCREWS
 
----
-
-## 10. Notatki integracyjne (krótko)
+## 9. Notatki integracyjne (krótko)
 - **Jetson** zasilać z osobnej przetwornicy 5V ≥8A + bezpiecznik na gałęzi.
 - Przewody silników skręcać parami, prowadzić z dala od USB/LiDAR.
 - Kondensatory 2200 µF montować możliwie blisko BTS7960.
