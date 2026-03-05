@@ -1,22 +1,52 @@
-| MODEL                                       |   ILOŚĆ  | Napięcie            |                                                                                 LINK                                                                                 | CENA | UWAGI                  |
+# GÓRNY SEGMENT — Percepcja / Compute
+
+| MODEL | ILOŚĆ | Napięcie | LINK | CENA | UWAGI |
 | :------------------------------------------ | :------: | :------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :--: | :--------------------- |
-| **NVIDIA Jetson Orin Nano 8GB**             |     1    | 7–20V DC, min. 3–5A |                                       [link](https://www.conrad.pl/pl/p/jetson-orin-nano-nvidia-8-gb-6-x-1-5-ghz-2998506.html)                                       | 1789 | Komputer główny robota |
-| **Dysk SSD PNY CS2230 500GB**               |     1    | [-]                 |                           [link](https://www.morele.net/dysk-ssd-pny-cs2230-500gb-m-2-2280-pci-e-x4-gen3-nvme-m280cs2230-500-rb-12718938/)                           |  311 | System + logi          |
-| **SanDisk Extreme 256GB**                   |     1    | [-]                 |                                 [link](https://www.amazon.pl/Sandisk-Extreme-SDSQXAA-128G-GN6MA-Pami%C4%99ci-Czerwony/dp/B09X7CRKRZ/)                                |  110 | microSD                |
-| **Kamera AR0234 2.3MPx**                    |     1    | 5V                  | [link](https://botland.com.pl/akcesoria-do-nvidia/23590-kamera-ar0234-23mpx-color-global-shutter-do-nvidia-jetson-nanoxavier-nxorin-nx-z-obudowa-arducam-b0429.html) |  520 | Global shutter         |
-| **Skaner laserowy RPLiDAR A1M8**            |     1    | 5V                  |             [link](https://botland.com.pl/skanery-laserowe/19625-skaner-laserowy-rplidar-a1m8-r6-360-stopni-12m-seeedstudio-114992561-5904422369248.html)            |  380 | SLAM                   |
-| **Tank Chassis MG540 (z enkoderami)**       |     1    | 12V                 |                                                                        [link](https://pl.aliexpress.com/item/1005008489785257.html?spm=a2g0o.productlist.main.12.92c25ca02meNg1&algo_pvid=ed6aaef5-b20c-4462-ae38-464c02df248c&pdp_ext_f=%7B"order"%3A"20"%2C"eval"%3A"1"%2C"fromPage"%3A"search"%7D&utparam-url=scene%3Asearch%7Cquery_from%3A%7Cx_object_id%3A1005008489785257%7C_p_origin_prod%3A&fbclid=IwY2xjawQVa8pleHRuA2FlbQIxMQBzcnRjBmFwcF9pZAEwAAEe3ee7yqYxr2oO-2V-1XIEkEwD2OWJ12wFW3ThLRgkeVCknrVLHkd659azgaw_aem_ZKrJV7jNjQPVbQTsw8IR1A#nav-specification)                                                                       | ~500 | Podwozie gąsienicowe   |
-| **Sterownik silnika BTS7960**               |     2    | 6–27V               |                               [link](https://botland.com.pl/sterowniki-silnikow/2503-sterownik-silnika-bts7960-43a-5904422334437.html)                               |  ~35 | Po jednym na silnik    |
-| **STM32 NUCLEO-F401RE**                     |     1    | 5V                  |                     [link](https://botland.com.pl/zestawy-uruchomieniowe-stm32-nucleo/1873-stm32-nucleo-f401re-stm32f401ret6-5904422326197.html)                     |  ~85 | Sterowanie napędem     |
-| **Akumulator LiPo 3S 5000mAh 30C**          |     1    | 11.1V               |                                                                         [link](LINK_BATERIA)                                                                         | ~150 | Zasilanie robota       |
-| **Ładowarka LiPo (np. SkyRC B6)**           |     1    | 230V                |                                                                        [link](LINK_LADOWARKA)                                                                        | ~150 | Ładowanie akumulatora  |
-| **Przetwornica DC-DC 5V 10A**               |     1    | 7–24V → 5V          |                                                                       [link](LINK_PRZETWORNICA)                                                                      |  ~35 | Zasilanie Jetsona      |
-| **Bezpiecznik ATO 15A**                     |     1    | [-]                 |                                                                       [link](LINK_BEZPIECZNIK)                                                                       |  ~5  | Zabezpieczenie         |
-| **Oprawka bezpiecznika ATO**                |     1    | [-]                 |                                                                         [link](LINK_OPRAWKA)                                                                         |  ~10 | Do instalacji          |
-| **Wyłącznik główny zasilania**              |     1    | [-]                 |                                                                          [link](LINK_SWITCH)                                                                         |  ~40 | Power switch           |
-| **Złącza XT60 (para)**                      |     2    | [-]                 |                                                                           [link](LINK_XT60)                                                                          |  ~10 | Zasilanie              |
-| **Przewody silikonowe 14AWG**               |    2m    | [-]                 |                                                                           [link](LINK_WIRE)                                                                          |  ~20 | Zasilanie silników     |
-| **Przewody Dupont**                         | 1 zestaw | [-]                 |                                                                          [link](LINK_DUPONT)                                                                         |  ~15 | Połączenia sygnałowe   |
-| **Dystanse montażowe M3**                   | 1 zestaw | [-]                 |                                                                         [link](LINK_STANDOFF)                                                                        |  ~20 | Montaż elektroniki     |
-| **Śruby M3 (zestaw)**                       |     1    | [-]                 |                                                                          [link](LINK_SCREWS)                                                                         |  ~20 | Montaż                 |
-| **Płytka prototypowa / power distribution** |     1    | [-]                 |                                                                          [link](LINK_PROTO)                                                                          |  ~15 | Dystrybucja zasilania  |
+| **NVIDIA Jetson Orin Nano 8GB DEV KIT** | 1 | 7–20V DC, min. 3–5A | [link](https://www.conrad.pl/pl/p/jetson-orin-nano-nvidia-8-gb-6-x-1-5-ghz-2998506.html) | 1789 | Komputer główny robota |
+| **Dysk SSD PNY CS2230 500GB** | 1 | [-] | [link](https://www.morele.net/dysk-ssd-pny-cs2230-500gb-m-2-2280-pci-e-x4-gen3-nvme-m280cs2230-500-rb-12718938/) | 311 | System + logi |
+| **SanDisk Extreme 256GB** | 1 | [-] | [link](https://www.amazon.pl/Sandisk-Extreme-SDSQXAA-128G-GN6MA-Pami%C4%99ci-Czerwony/dp/B09X7CRKRZ/) | 110 | microSD |
+| **Kamera AR0234 2.3MPx** | 1 | 5V | [link](https://botland.com.pl/akcesoria-do-nvidia/23590-kamera-ar0234-23mpx-color-global-shutter-do-nvidia-jetson-nanoxavier-nxorin-nx-z-obudowa-arducam-b0429.html) | 520 | Global shutter |
+| **Skaner laserowy RPLiDAR A1M8** | 1 | 5V | [link](https://botland.com.pl/skanery-laserowe/19625-skaner-laserowy-rplidar-a1m8-r6-360-stopni-12m-seeedstudio-114992561-5904422369248.html) | 380 | SLAM |
+| **STM32 NUCLEO-F401RE** | 1 | 5V | [link](https://botland.com.pl/zestawy-uruchomieniowe-stm32-nucleo/1873-stm32-nucleo-f401re-stm32f401ret6-5904422326197.html) | ~85 | Sterowanie napędem |
+
+---
+
+# DOLNY SEGMENT — Zasilanie / Napęd
+
+| MODEL | ILOŚĆ | Napięcie | LINK | CENA | UWAGI |
+| :------------------------------------------ | :------: | :------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :--: | :--------------------- |
+| **Tank Chassis MG540 (z enkoderami)** | 1 | 12V | [link](https://pl.aliexpress.com/item/1005008489785257.html) | ~500 | Podwozie gąsienicowe |
+| **LiPo 3S Gens Ace 5000mAh 60C** | 1 | 11.1V | [link](https://www.modelmania.pl/sklep/strona-glowna/209-akumulator-gens-ace-5000mah-111v-60c-3s-xt60.html) | ~150 | Zasilanie robota XT60 |
+| **Ładowarka LiPo (np. SkyRC B6)** | 1 | 230V | [link](LINK_LADOWARKA) | ~150 | Ładowanie akumulatora |
+| **LiPo voltage alarm** | 1 | [-] | [link](https://pl.aliexpress.com/item/1005002718956934.html) | 5 | Alarm napięcia |
+| **Wyłącznik główny zasilania** | 1 | [-] | brak | ~10 | kupić lokalnie |
+| **Przetwornica DC-DC STEP DOWN 10V 5V** | 1 | 7–24V → 5V | [link](LINK_PRZETWORNICA) | ~35 | Zasilanie STM |
+| **Sterownik silnika BTS7960** | 2 | 6–27V | [link](https://botland.com.pl/sterowniki-silnikow/2503-sterownik-silnika-bts7960-43a-5904422334437.html) | ~35 | Po jednym na silnik |
+| **Dystanse montażowe M3** | 1 zestaw | [-] | [link](LINK_STANDOFF) | ~20 | Montaż elektroniki 
+| **Śruby M3 (zestaw)** | 1 | [-] | [link](LINK_SCREWS) | ~20 | Montaż |
+| **Skrzynia Bezpiecznikowa** | 1 | 12V | [link](https://pl.aliexpress.com/item/1005008090414736.html) | 30 | Dystrybucja zasilania |
+
+
+---
+
+# ELEMENTY DO KUPIENIA LOKALNIE
+
+| MODEL | ILOŚĆ | Napięcie | LINK | CENA | UWAGI |
+| :------------------------------------------ | :------: | :------: | :--: | :--: | :--------------------- |
+| Zaciski oczkowe do przewodów zasilających | zestaw | [-] | brak | [-] | kupić lokalnie |
+| Zaciski przewodów do silników i step-down | zestaw | [-] | brak | [-] | kupić lokalnie |
+| **XT60 przewody (męska końcówka)** | 2 | [-] | brak | ~10 | kupić lokalnie |
+| **Bezpieczniki ATO** | 3 | [-] | brak | [-] | MAMY (5A Jetson, 15A silniki, 2A STEP DOWN) |
+| Holder na główny bezpiecznik | 1 | [-] | brak | [-] | kupić lokalnie |
+| Koszulki termokurczliwe | zestaw | [-] | brak | [-] | kupić lokalnie |
+
+---
+
+# KABLE / POŁĄCZENIA
+
+| MODEL | ILOŚĆ | Napięcie | LINK | CENA | UWAGI |
+| :------------------------------------------ | :------: | :------: | :------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :--: | :--------------------- |
+| Wtyk zasilający Jetson 5.5mm / 2.5mm | 1 | [-] | [link](https://pl.aliexpress.com/item/1005007656068465.html) | ~5 | zasilanie Jetsona |
+| Ethernet CAT6 2m | 1 | [-] | [link](https://pl.aliexpress.com/item/1005009121518528.html) | ~8 | Jetson ↔ komputer |
+| USB A → mini USB 0.5m | 1 | [-] | [link](https://pl.aliexpress.com/item/1005002253497663.html) | ~4 | STM ↔ Jetson |
+| **Przewody silikonowe 15AWG** | 1m | [-] | [link](LINK_WIRE) | ~20 | Zasilanie silników |
