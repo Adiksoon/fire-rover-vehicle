@@ -8,6 +8,8 @@
 | **Kamera AR0234 2.3MPx** | 1 | [-] | [link](https://botland.com.pl/akcesoria-do-nvidia/23590-kamera-ar0234-23mpx-color-global-shutter-do-nvidia-jetson-nanoxavier-nxorin-nx-z-obudowa-arducam-b0429.html) | 520 | Global shutter |
 | **Skaner laserowy RPLiDAR A1M8** | 1 | [-] | [link](https://botland.com.pl/skanery-laserowe/19625-skaner-laserowy-rplidar-a1m8-r6-360-stopni-12m-seeedstudio-114992561-5904422369248.html) | 380 | SLAM |
 | **STM32 NUCLEO-F401RE** | 1 | 5V | [link](https://kamami.pl/stm-nucleo-64/212018-nucleo-f401re-zestaw-startowy-z-mikrokontrolerem-z-rodziny-stm32-stm32f401-5906623435852.html) | 80 | Sterowanie napędem |
+| **IMU MPU9250 9DOF** | 1 | 3.3–5V | [link](https://botland.com.pl/akcelerometry-zyroskopy-i-imu/2057-modul-imu-9dof-mpu9250-akcelerometr-zyroskop-magnetometr.html) | ~35 | orientacja robota / odometria |
+
 
 ---
 
