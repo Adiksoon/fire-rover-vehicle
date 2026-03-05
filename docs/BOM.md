@@ -16,7 +16,7 @@
 | **NVIDIA Jetson Orin Nano 8GB DEV KIT** | 1 | 7–20V DC, min. 3–5A | https://www.conrad.pl/pl/p/jetson-orin-nano-nvidia-8-gb-6-x-1-5-ghz-2998506.html | 1789 | Komputer główny robota |
 | **SSD M.2 2280 NVMe 500GB (PNY CS2230 lub równoważny)** | 1 | [-] | https://www.morele.net/dysk-ssd-pny-cs2230-500gb-m-2-2280-pci-e-x4-gen3-nvme-m280cs2230-500-rb-12718938/ | 311 | System + logi |
 | **microSD 128–256GB (SanDisk Extreme lub równoważna)** | 1 | [-] | https://www.amazon.pl/Sandisk-Extreme-SDSQXAA-128G-GN6MA-Pami%C4%99ci-Czerwony/dp/B09X7CRKRZ/ | 110 | nośnik pomocniczy / recovery |
-| **Wi‑Fi / BT (jeśli brak w Jetson / potrzebne SSH bez kabla)** | 1 | 5V/USB | WYMAGANIA: dongle USB 2.4/5 GHz z Linux support | ~50 | opcjonalnie |
+
 
 ---
 
