@@ -71,11 +71,11 @@
 | **USB A → mini USB 0.5m (STM32 ↔ Jetson)** | 1 | [-] | https://pl.aliexpress.com/item/1005002253497663.html | ~4 | jeśli zostajecie na USB |
 | **Ethernet CAT6 2m (debug)** | 1 | [-] | https://pl.aliexpress.com/item/1005009121518528.html | ~8 | Jetson ↔ PC |
 | **Powered USB Hub (zasilany)** | 1 | 5V | https://allegro.pl/oferta/orico-hub-aktywny-biurkowy-4-usb-a-5gbps-aluminium-17574811803?bi_s=ads&bi_m=productlisting:desktop:query&bi_c=ZDczNGZlMzYtYTIxYi00Y2EwLWJiN2EtZDNlOGNkNTZlMjU0AA&bi_t=ape&referrer=proxy&emission_unit_id=2b27075c-cb06-4c20-8121-bea02c27bb5b | ~40–80 | zwykle potrzebny (LiDAR + debug) |
-| **Przewody silikonowe do silników (15AWG)** | 2–3 m | [-] | LINK_WIRE | ~20/m | zasilanie napędu, skręcać pary |
-| **Złącza JST‑XH / JST‑PH (zestaw)** | 1 | [-] | WYMAGANIA: komplet wtyk+gniazdo + piny + zaciskarka (opcjonalnie) | ~30–80 | bardzo ułatwia porządek w kablach |
+| **Przewody silikonowe do silników (15AWG)** | 2–3 m | [-] | https://www.rc4max.com/przewod-silikonowy-1-7-mm-15-awg-ok-1mb-czarny-+-czerwony | ~20/m | zasilanie napędu, skręcać pary |
+| **Złącza JST‑XH / JST‑PH (zestaw)** | 1 | [-] | https://botland.com.pl/zlacza-raster-254mm/23834-zestaw-zlacz-jst-xh254-678910-pin-meskiezenskie-i-pinow-zenskich-do-obudowy-gniazda-260szt-justpi-5904422384234.html | ~30–80 | bardzo ułatwia porządek w kablach |
 | **Koszulki termokurczliwe (zestaw)** | 1 | [-] | lokalnie | ~10–20 | izolacja |
 | **Opaski zaciskowe (trytytki) + rzepy** | 1 kpl. | [-] | lokalnie | ~10–20 | organizacja przewodów |
-| **Ferryt na przewody / rdzenie ferrytowe (zestaw)** | 1 | [-] | WYMAGANIA: klipsy ferrytowe na przewody zasilania/USB | ~20–40 | redukcja EMI |
+| **Ferryt na przewody / rdzenie ferrytowe (zestaw)** | 1 | [-] | https://www.amazon.com/IEUYO-Ferrite-Signal-Suppressor-Diameter/dp/B07DPM44BV? | ~20–40 | redukcja EMI |
 | **Zaciski oczkowe + końcówki tulejkowe + konektory** | 1 kpl. | [-] | lokalnie | ~20–50 | połączenia zasilania |
 
 ---
@@ -83,8 +83,8 @@
 ## 7. MECHANICAL / MOUNTING (MONTAŻ)
 | MODEL | ILOŚĆ | LINK | CENA | UWAGI |
 | :-- | :--: | :-- | :--: | :-- |
-| **Dystanse montażowe M3** | 1 zestaw | LINK_STANDOFF | ~20 | montaż elektroniki |
-| **Śruby M3 (zestaw)** | 1 zestaw | LINK_SCREWS | ~20 | montaż |
+| **Dystanse montażowe M3** | 1 zestaw | https://botland.com.pl/tuleje-dystansowe/23074-zestaw-srubek-i-podkladek-dystansowych-m3-zestaw-a-120szt-justpi-5904422383985.html | ~20 | montaż elektroniki |
+| **Śruby M3 (zestaw)** | 1 zestaw | https://botland.com.pl/tuleje-dystansowe/23074-zestaw-srubek-i-podkladek-dystansowych-m3-zestaw-a-120szt-justpi-5904422383985.html | ~20 | montaż |
 | **Mocowanie LiDAR (uchwyt) + śruby** | 1 | WYMAGANIA: sztywne mocowanie, minimalne drgania | ~20 | można druk 3D |
 | **Mocowanie kamery (uchwyt) + śruby** | 1 | WYMAGANIA: regulacja kąta | ~20 | można druk 3D |
 | **Taśma dwustronna piankowa / podkładki antywibracyjne** | 1 | lokalnie | ~10–20 | pod IMU / elektronikę |
