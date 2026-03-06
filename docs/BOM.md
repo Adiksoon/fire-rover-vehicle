@@ -26,7 +26,7 @@
 | **Kamera AR0234 2.3MP global shutter (Arducam B0429 lub równoważna)** | 1 | zasilanie przez CSI/Jetson | https://botland.com.pl/akcesoria-do-nvidia/23590-kamera-ar0234-23mpx-color-global-shutter-do-nvidia-jetson-nanoxavier-nxorin-nx-z-obudowa-arducam-b0429.html | 520 | ArUco |
 | **RPLiDAR A1M8** | 1 | 5V (USB) | https://botland.com.pl/skanery-laserowe/19625-skaner-laserowy-rplidar-a1m8-r6-360-stopni-12m-seeedstudio-114992561-5904422369248.html | 380 | SLAM 2D |
 | **IMU MPU-9250 (GY-9250) 9DOF** | 1 | 3.3–5V | https://kamami.pl/czujniki-6dof-9dof-10dof/557794-modmpu9250-gy-9250-modul-9dof-z-ukladem-mpu-9250-akcelerometr-magnetometr-zyroskop-5906623454754.html | ~35 | EKF / orientacja |
-| **Przewód CSI/adapter (jeśli wymagany przez wybraną kamerę)** | 1 | [-] | WYMAGANIA: zgodny z Jetson Orin Nano i modułem kamery | ~30 | często w komplecie – zweryfikować |
+
 
 ---
 
@@ -44,7 +44,7 @@
 | **Tank Chassis MG540 (z enkoderami)** | 1 | 12V | https://pl.aliexpress.com/item/1005008489785257.html | 520 | podwozie |
 | **Sterownik silnika BTS7960** | 2 | 6–27V | https://botland.com.pl/sterowniki-silnikow/2503-sterownik-silnika-bts7960-43a-5904422334437.html | ~35 | 1× lewy + 1× prawy |
 | **Filtr/odsprzęganie przy mostkach H (kondensator elektrolityczny)** | 2 | ≥25V | https://www.tme.eu/pl/details/eeufr1e222l/kondensatory-elektrolityczne-tht/panasonic/ | ~10 | montować blisko BTS |
-| **Kondensator przy wejściu Jetsona (bufor)** | 1 | ≥16V | https://www.tme.eu/pl/details/eeufr1c102/kondensatory-elektrolityczne-tht/panasonic/ | ~5 | przy jacku zasilania Jetsona |
+
 
 ---
 
