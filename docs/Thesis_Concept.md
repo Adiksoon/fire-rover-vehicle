@@ -1,45 +1,32 @@
 # Autonomous Tracked Vehicle
 
 ## 1. Cel pracy
-Celem pracy jest zaprojektowanie i zbudowanie autonomicznego pojazdu moblinego poruszajacego sie na podwoziu gasienicowym. Robot jest zdolny do mapowania nieznanego otoczenia oraz samodzielnego dojazdu do wskazanego celu w postaci wizualnego znacznika (marker ArUco) wykrywanego przez kamerę. Trasa przejazdu wyznaczana jest automatycznie na podstawie mapy otoczenia oraz algorytmu planowania ścieżki, z uwzględnieniem przeszkód.
+Celem pracy jest oprogramowanie i uruchomienie autonomicznego pojazdu mobilnego na platformie gąsienicowej. Głównym zadaniem robota jest realizacja fuzji danych sensorycznych (LiDAR + kamera stereoskopowa) do budowy trójwymiarowej mapy otoczenia (3D SLAM). Na podstawie tej mapy system ma planować trajektorię i dotrzeć do celu, którym jest fizyczny obiekt (np. gaśnica, plecak, krzesło) rozpoznawany w czasie rzeczywistym przez sieć neuronową (np. YOLO) uruchomioną na akceleratorze sprzętowym kamery.
 
 ## 2. Hardware
-Zakres pracy obejmuje:
-
-### Część sprzętowa
-- budowa pojazdu gąsienicowego,
-- dobór napędu i zasilania,
-- integracja komputera pokładowego,
-- montaż kamery i czujników odległości.
+Konfiguracja opiera się na gotowej platformie badawczej z modyfikacjami zasilania i sensoryki:
+- **Platforma bazowa:** UGV Beast PT ROS2 Kit (podwozie gąsienicowe, napęd z enkoderami, wieżyczka Pan-Tilt do skanowania wizyjnego).
+- **Jednostka obliczeniowa:** NVIDIA Jetson Orin Nano 8GB (główny węzeł dla algorytmów RTAB-Map i planowania ścieżki).
+- **Sensor wizyjny i AI:** Kamera OAK-D Lite. Odpowiada za dostarczanie chmury punktów RGB-D oraz sprzętową inferencję modelu sieci neuronowej (Spatial Object Detection) z użyciem wbudowanego koprocesora VPU.
+- **Sensor dystansu:** LiDAR DToF STL27L (skanowanie 360°, zasięg 25m) – dostarcza precyzyjne pomiary odległości do fuzji z obrazem z kamery.
+- **Zasilanie:** Pakiet ogniw Li-Ion (Samsung 30Q 15A) z wbudowanym układem sprzętowego UPS.
 
 ## 3. Software
-### Część programowa
-- konfiguracja środowiska ROS2,
-- implementacja mapowania (SLAM)
-- lokalizacja robota,
-- planowanie trasy przejazdu,
-- detekcja celu przy użyciu kamery,
-- autonomiczne sterowanie ruchem robota.
+Stos technologiczny w środowisku ROS2:
+- **OS / Środowisko:** Ubuntu 22.04 + ROS2 Humble.
+- **Fuzja Danych i Mapowanie (3D SLAM):** Pakiet RTAB-Map łączący precyzję geometrii z lasera z teksturami i głębią z kamery do budowy przestrzennej mapy zajętości (OctoMap).
+- **Nawigacja:** Nawigacja uwzględniająca przeszkody statyczne i podwieszone (Local Planner zasilany na bieżąco chmurą punktów 3D).
+- **Wizja Maszynowa (AI):** Detekcja obiektów oparta na modelu YOLOv8 (lub pokrewnym). Model działa wyłącznie na koprocesorze kamery (VPU), który bezpośrednio zwraca do środowiska ROS2 fizyczne współrzędne (X, Y, Z) zidentyfikowanego obiektu względem bazy robota, odciążając główny procesor.
 
-
-
-### Narzędzia i technologie
-- Linux Ubuntu 22.04
-- ROS2
-- NVIDIA Jetson
-- OpenCV
-- algorytmy SLAM
-- planowanie ścieżki (path planning)
-
-## 4. Dzialanie systemu
-### Start - Lokalizacja celu
-Robot po uruchomieniu dokonuje skanowania otoczenia i tworzy mape otoczenia rozpoczyna szukanie znacznika. Po wykryciu markera określana jest jego pozycja względem robota oraz wyznaczany jest punkt celu na mapie. Następnie system planowania trasy wyznacza bezkolizyjną ścieżkę przejazdu z uwzględnieniem przeszkód znajdujących się w otoczeniu.
-### W trakcie dzialania
-Robot na bieżąco estymuje swoją pozycję na podstawie odometrii i danych z czujników. System sterowania porównuje aktualną pozycję z zaplanowaną trajektorią i koryguje ruch robota. W przypadku pojawienia się przeszkód planowana jest lokalna korekta trasy.
+## 4. Działanie systemu
+### Start - Eksploracja przestrzeni (Frontier Exploration)
+Po uruchomieniu robot zaczyna proces budowy mapy 3D (RTAB-Map). Ponieważ cel nie jest znany z góry, system wchodzi w tryb aktywnej eksploracji. Algorytm nawigacyjny wyznacza tymczasowe punkty trasy w nieodkrytych rejonach sali, zmuszając robota do fizycznego poruszania się i skanowania środowiska. W trakcie jazdy koprocesor VPU w kamerze nieprzerwanie analizuje strumień wideo pod kątem obecności poszukiwanego obiektu (YOLO).
+### Wykrycie celu i planowanie (Global & Local)
+W momencie zidentyfikowania obiektu przez sieć neuronową, tryb eksploracji zostaje natychmiast przerwany. Kamera sprzętowo rzutuje środek wykrytego obiektu na chmurę punktów, a jego fizyczne współrzędne (X, Y, Z) są zapisywane jako ostateczny punkt docelowy (goal_pose) na mapie. Od tego momentu Global Planner wyznacza optymalną trasę dojazdu. Podczas jazdy Local Planner w czasie rzeczywistym przetwarza dane o głębi z OAK-D Lite, korygując wektor ruchu, aby płynnie wyminąć statyczne i nowo pojawiające się przeszkody.
 ### Koniec
-Robot dojezdza i zatrzymuje sie przy celu
+Pojazd dociera do rozpoznanego obiektu, ustawia się w zdefiniowanej strefie buforowej przodem do niego i raportuje zakończenie misji.
+
+
 
 ### Ograniczenia projektu
-Robot przeznaczony jest do pracy w środowisku wewnętrznym (np. sala, korytarz, hala) o utwardzonej nawierzchni. Konstrukcja nie jest przystosowana do pracy na zewnątrz ani w trudnych warunkach terenowych.
-
-
+Konstrukcja przeznaczona wyłącznie do pracy wewnątrz budynków (indoor) na twardym i płaskim podłożu. Algorytmika nie zakłada nawigacji w terenie otwartym ani odporności na skrajne warunki oświetleniowe (np. silne odblaski, całkowite zaciemnienie), które mogłyby uniemożliwić prawidłową inferencję modelu wizyjnego.
