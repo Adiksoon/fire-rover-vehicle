@@ -3,86 +3,86 @@
 ## Schemat blokowy
 
 ### START
-**Opis:**  
+**Opis:**
 Inicjalizacja systemu, uruchomienie węzłów ROS2 oraz sterowników sprzętowych.
 
-**Wyjście:**  
-- LIDAR  
-- OAK-D LITE  
+**Wyjście:**
+- LIDAR
+- OAK-D LITE
 
 ---
 
 ### LIDAR (Laser Scanner)
-**Opis:**  
+**Opis:**
 Sensor wykonujący skanowanie otoczenia w płaszczyźnie 2D. Dane geometryczne (odległość od ścian i przeszkód statycznych) są wykorzystywane do budowy mapy.
 
-**Wyjście:**  
-- SLAM 3D  
+**Wyjście:**
+- SLAM 3D
 
 ---
 
 ### OAK-D LITE
-**Opis:**  
-Kamera stereoskopowa generująca chmurę punktów RGB-D.  
+**Opis:**
+Kamera stereoskopowa generująca chmurę punktów RGB-D.
 Służy do mapowania przestrzennego, weryfikacji obiektów oraz omijania przeszkód w trzech wymiarach.
 
-**Wyjście:**  
-- SLAM 3D  
-- YOLO VPU  
+**Wyjście:**
+- SLAM 3D
+- YOLO VPU
 
 ---
 
 ### SLAM 3D (Simultaneous Localization and Mapping)
-**Opis:**  
+**Opis:**
 Moduł **RTAB-Map** integrujący dane z LIDAR oraz OAK-D LITE w celu stworzenia trójwymiarowej mapy otoczenia (**OctoMap**).
 
-**Wyjście:**  
-- EXPLORATION PLANNER  
-- EKF CHECK  
+**Wyjście:**
+- EXPLORATION PLANNER
+- EKF CHECK
 
 ---
 
 ### EXPLORATION PLANNER
-**Opis:**  
-Moduł odpowiedzialny za autonomiczną eksplorację sali (**Frontier Exploration**).  
+**Opis:**
+Moduł odpowiedzialny za autonomiczną eksplorację sali (**Frontier Exploration**).
 Wyznacza tymczasowe cele ruchu w nieodkrytych obszarach mapy, dopóki obiekt nie zostanie wykryty.
 
-**Wyjście:**  
-- CAMERA PT  
+**Wyjście:**
+- CAMERA PT
 
 ---
 
 ### CAMERA PT (Pan-Tilt Camera)
-**Opis:**  
+**Opis:**
 Szerokokątna kamera (**160° FOV**) na ruchomej wieżyczce odpowiedzialna za aktywne, wstępne przeszukiwanie sali niezależnie od kierunku jazdy robota.
 
-**Wyjście:**  
-- YOLO  
+**Wyjście:**
+- YOLO
 
 ---
 
 ### YOLO
-**Opis:**  
-Proces detekcji obiektów realizowany na obrazie z kamery szerokokątnej.  
+**Opis:**
+Proces detekcji obiektów realizowany na obrazie z kamery szerokokątnej.
 W momencie wizualnego rozpoznania celu przerywa tryb eksploracji.
 
-**Wyjście:**  
-- YOLO VPU  
+**Wyjście:**
+- YOLO VPU
 
 ---
 
 ### YOLO VPU (Verification Mode)
-**Opis:**  
-Moduł weryfikacji działający na koprocesorze kamery **OAK-D LITE**.  
+**Opis:**
+Moduł weryfikacji działający na koprocesorze kamery **OAK-D LITE**.
 Po otrzymaniu sygnału z YOLO wykonuje precyzyjną weryfikację obiektu i wyznacza jego współrzędne przestrzenne **goal_pose(t)**.
 
-**Wyjście:**  
-- Węzeł sumacyjny 1  
+**Wyjście:**
+- Węzeł sumacyjny 1
 
 ---
 
 ### EKF (Extended Kalman Filter)
-**Opis:**  
+**Opis:**
 Filtr dokonujący fuzji danych z:
 
 - enkoderów
@@ -91,92 +91,92 @@ Filtr dokonujący fuzji danych z:
 
 w celu wyznaczenia stabilnej odometrii lokalnej.
 
-**Wyjście:**  
-- EKF CHECK  
+**Wyjście:**
+- EKF CHECK
 
 ---
 
 ### EKF CHECK
-**Opis:**  
-Węzeł korygujący dane z filtra EKF na podstawie globalnej mapy z modułu SLAM 3D.  
+**Opis:**
+Węzeł korygujący dane z filtra EKF na podstawie globalnej mapy z modułu SLAM 3D.
 Wyznacza ostateczną pozycję robota w przestrzeni **robot_pose(t)**.
 
-**Wyjście:**  
-- Węzeł sumacyjny 1  
+**Wyjście:**
+- Węzeł sumacyjny 1
 
 ---
 
 ### Węzeł sumacyjny 1
-**Opis:**  
+**Opis:**
 Oblicza uchyb poprzez porównanie aktualnej pozycji **robot_pose(t)** z pozycją celu **goal_pose(t)**.
 
-**Wyjście:**  
-- ROUTE PLANNER  
+**Wyjście:**
+- ROUTE PLANNER
 
 ---
 
 ### ROUTE PLANNER (Global Planner)
-**Opis:**  
+**Opis:**
 Planowanie optymalnej trajektorii do celu na podstawie mapy 3D, uwzględniające najkorzystniejszą trasę przejazdu.
 
-**Wyjście:**  
-- REAL TIME PLANNER  
+**Wyjście:**
+- REAL TIME PLANNER
 
 ---
 
 ### REAL TIME PLANNER (Local Planner)
-**Opis:**  
-Moduł korygujący trajektorię w czasie rzeczywistym.  
+**Opis:**
+Moduł korygujący trajektorię w czasie rzeczywistym.
 Wykorzystuje chmurę punktów z **OAK-D LITE** do wykrywania i omijania przeszkód niewidocznych dla LIDAR-u.
 
-**Wyjście:**  
-- PID  
+**Wyjście:**
+- PID
 
 ---
 
 ### PID (Controller)
-**Opis:**  
+**Opis:**
 Regulator sterowania obliczający sygnały prędkości zadanej na podstawie wyznaczonego uchybu trajektorii.
 
-**Wyjście:**  
-- MOTORS  
+**Wyjście:**
+- MOTORS
 
 ---
 
 ### MOTORS (Drive System)
-**Opis:**  
+**Opis:**
 Układ wykonawczy robota (sterowniki i silniki gąsienic), wprawiający platformę w ruch.
 
-**Wyjście:**  
-- ROBOT  
+**Wyjście:**
+- ROBOT
 
 ---
 
 ### ROBOT (Mobile Robot Platform)
-**Opis:**  
-Fizyczny obiekt sterowania.  
+**Opis:**
+Fizyczny obiekt sterowania.
 Ruch robota jest monitorowany przez czujniki wewnętrzne.
 
-**Wyjście:**  
-- IMU  
-- ENCODERS  
+**Wyjście:**
+- IMU
+- ENCODERS
 
 ---
 
 ### IMU & ENCODERS
-**Opis:**  
-Czujniki inercyjne oraz enkodery kół mierzące parametry ruchu fizycznego.  
+**Opis:**
+Czujniki inercyjne oraz enkodery kół mierzące parametry ruchu fizycznego.
 Dane trafiają do filtra EKF, zamykając pętlę sprzężenia zwrotnego pozycji.
 
-**Wyjście:**  
-- EKF  
+**Wyjście:**
+- EKF
 
 #### STRUKTURA PAKIETOW I NODE'OW
 
 ### Robot Calibration Pakiet
 |-Initialization_Node - odpowiedzialny za inicjalizacje cyklu; zaweira flage (maszyne stanu) odnosnie stanu pracy maszyny; informacje na temat szukanego modelu PUB: /Target_Config
 
-### Robot Perception Pakiet 
+### Robot Perception Pakiet
 Odpowiada za detekcje obrazu oraz estymacje jego polozenia wzgledem robota. System percepcji wykorzystuje dwustopniowa architekture detekcji tzn. korzystamy z dwoch kamer o roznym charakterze.
 1) Kamera szerokokatna zamontowana na mechanizmie **pan-tilt** -odpowiada za wyszukiwanie obiektu
 2) Kamera stereowizyjna **OAK-D Lite** - odpowiedzialna za dokladna estymacje pozycji obiektu w przestrzeni 3D. Tzn. kamera OAK-D Lite posiada wbudowany koprocesor, ktory umozliwia wykonaie inferencji sieci neuronowych bezposrednio na urzadzeniu oraz laczenie wynikow detekcji z informacja o glebi. Dzieki temu kamera potrafi zwrocic wspolrzedne przestrzenne wykrytego obiektu bez konecznosci dodatkowego przetwarzania.
@@ -213,7 +213,7 @@ Odpowiada za estymacje aktualnej pozycji robota w czasie rzeczywistym. W systemi
 ## |- IMU_Driver_Node -  odpowiada za odebranie danych z czujnika i upublikowanie ich w PUB: /imu_raw
 
 --
-## SUB /wheel_odom & /visual_odom & /imu |-EKF_Node - node implementacji rozszerzonego filtru Kalmana laczy wszystkie zrodla odometrii. PUB: /odom **Typ wiadomosci** nav_msgs/Odometry 
+## SUB /wheel_odom & /visual_odom & /imu |-EKF_Node - node implementacji rozszerzonego filtru Kalmana laczy wszystkie zrodla odometrii. PUB: /odom **Typ wiadomosci** nav_msgs/Odometry
 
 ### Robot_slam
 Pakiet odpowiedzialny za zbudowanie SLAM Simultaneous Localization and Mapping
@@ -266,4 +266,12 @@ Pakiet jest odpowiedzialny za komunikacje z fizycznymi komponentami robota.
 --
 ## SUB: /weel_velocity_cmd |-Motor_Driver_Node
 
+
+Kolejnosc programowania node:
+(1) robot_description
+(2) robot_localization
+(3) robot_slam
+(4) robot_navigation
+(5) robot_perception
+(6) robot_control
 
