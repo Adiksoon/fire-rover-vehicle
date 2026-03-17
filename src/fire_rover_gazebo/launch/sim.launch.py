@@ -1,38 +1,38 @@
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import PathJoinSubstitution, FindExecutable
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, TimerAction
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 from launch_ros.actions import Node
-import os
-
-
 def generate_launch_description():
-    # Ścieżka do world file
-    world_file = os.path.join(
-        FindPackageShare("fire_rover_gazebo").find("fire_rover_gazebo"),
-        "worlds",
-        "empty.world",
+    world_arg = DeclareLaunchArgument(
+        "world",
+        default_value="lidar_test.world",
+        description="World file located in the fire_rover_gazebo/worlds directory.",
+    )
+    world_name_arg = DeclareLaunchArgument(
+        "world_name",
+        default_value="lidar_test_world",
+        description="Name of the SDF world to spawn the robot into.",
     )
 
-    # Ścieżka do URDF
-    urdf_path = os.path.join(
-        FindPackageShare("ugv_description").find("ugv_description"),
-        "urdf",
-        "ugv_beast.urdf",
+    world_file = PathJoinSubstitution(
+        [FindPackageShare("fire_rover_gazebo"), "worlds", LaunchConfiguration("world")]
+    )
+    urdf_path = PathJoinSubstitution(
+        [FindPackageShare("ugv_description"), "urdf", "ugv_beast.urdf"]
     )
 
-    # 1. Uruchomienie Ignition Gazebo
     gazebo = ExecuteProcess(
-        cmd=["ign", "gazebo", "--verbose", world_file],
+        cmd=["ign", "gazebo", "--verbose", "-r", world_file],
         output="screen",
     )
 
-    # 2. Spawn robota do Ignition
     spawn_robot = Node(
         package="ros_gz_sim",
         executable="create",
         arguments=[
+            "-world",
+            LaunchConfiguration("world_name"),
             "-name",
             "ugv_beast",
             "-file",
@@ -47,22 +47,30 @@ def generate_launch_description():
         output="screen",
     )
 
-    # 3. Bridge topików z Ignition do ROS2
-    # Mapuj lidar_scan z Ignition na ROS2 topic
     bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
         arguments=[
-            "/lidar_scan@sensor_msgs/msg/LaserScan@ignition.msgs.LaserScan",
-            "/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock",
+            "/cmd_vel@geometry_msgs/msg/Twist]gz.msgs.Twist",
+            "/lidar_scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan",
+            "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
+            "/imu@sensor_msgs/msg/Imu[gz.msgs.IMU",
+            "/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry",
+            "/tf@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V",
         ],
         output="screen",
     )
 
+    delayed_spawn = TimerAction(
+        period=5.0,
+        actions=[spawn_robot, bridge],
+    )
+
     return LaunchDescription(
         [
+            world_arg,
+            world_name_arg,
             gazebo,
-            spawn_robot,
-            bridge,
+            delayed_spawn,
         ]
     )

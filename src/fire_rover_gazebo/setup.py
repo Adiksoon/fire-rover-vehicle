@@ -11,7 +11,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
 	('share/' + package_name + '/launch', ['launch/sim.launch.py']),
-	('share/' + package_name + '/worlds', ['worlds/empty.world']),
+	('share/' + package_name + '/worlds', ['worlds/lidar_test.world']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
