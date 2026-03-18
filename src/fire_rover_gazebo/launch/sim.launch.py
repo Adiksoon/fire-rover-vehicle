@@ -96,14 +96,26 @@ def generate_launch_description():
         parameters=[ekf_config],
     )
 
-    delayed_ekf = TimerAction(
-        period=10.0,
-        actions=[ekf_node],
+    slam_config = PathJoinSubstitution(
+        [FindPackageShare("fire_rover_gazebo"), "config", "slam.yaml"]
+    )
+
+    slam_node = Node(
+        package="slam_toolbox",
+        executable="async_slam_toolbox_node",
+        name="slam_toolbox",
+        output="screen",
+        parameters=[slam_config],
     )
 
     delayed_spawn = TimerAction(
         period=5.0,
         actions=[spawn_robot, bridge],
+    )
+
+    delayed_ekf_slam = TimerAction(
+        period=15.0,
+        actions=[ekf_node, slam_node],
     )
 
     return LaunchDescription(
@@ -114,6 +126,6 @@ def generate_launch_description():
             gazebo,
             robot_state_publisher,
             delayed_spawn,
-            delayed_ekf,
+            delayed_ekf_slam,
         ]
     )

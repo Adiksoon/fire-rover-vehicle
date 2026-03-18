@@ -12,7 +12,7 @@
         <mesh filename="package://ugv_description/meshes/ugv_beast/base_link.stl" />
       </geometry>
       <material name="">
-        <color rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
+        <color rgba="1 0 0 1" />
       </material>
     </visual>
     <collision>
@@ -52,7 +52,7 @@
         <mesh filename="package://ugv_description/meshes/ugv_beast/left_up_wheel_link.stl" />
       </geometry>
       <material name="">
-        <color rgba="0.627450980392157 0.627450980392157 0.627450980392157 1" />
+        <color rgba="1 0 0 1" />
       </material>
     </visual>
     <collision>
@@ -80,7 +80,7 @@
         <mesh filename="package://ugv_description/meshes/ugv_beast/left_down_wheel_link.stl" />
       </geometry>
       <material name="">
-        <color rgba="0.627450980392157 0.627450980392157 0.627450980392157 1" />
+        <color rgba="1 0 0 1" />
       </material>
     </visual>
     <collision>
@@ -108,7 +108,7 @@
         <mesh filename="package://ugv_description/meshes/ugv_beast/right_up_wheel_link.stl" />
       </geometry>
       <material name="">
-        <color rgba="0.627450980392157 0.627450980392157 0.627450980392157 1" />
+        <color rgba="1 0 0 1" />
       </material>
     </visual>
     <collision>
@@ -136,7 +136,7 @@
         <mesh filename="package://ugv_description/meshes/ugv_beast/right_down_wheel_link.stl" />
       </geometry>
       <material name="">
-        <color rgba="0.627450980392157 0.627450980392157 0.627450980392157 1" />
+        <color rgba="1 0 0 1" />
       </material>
     </visual>
     <collision>
@@ -396,7 +396,7 @@ d
         <mesh filename="package://ugv_description/meshes/ugv_beast/3d_camera_link.stl" />
       </geometry>
       <material name="">
-        <color rgba="0.627450980392157 0.627450980392157 0.627450980392157 1" />
+        <color rgba="1 0 0 1" />
       </material>
     </visual>
     <collision>
@@ -425,7 +425,7 @@ d
         <mesh filename="package://ugv_description/meshes/ugv_beast/base_lidar_link.stl" />
       </geometry>
       <material name="">
-        <color rgba="0.627450980392157 0.627450980392157 0.627450980392157 1" />
+        <color rgba="1 0 0 1" />
       </material>
     </visual>
     <collision>
@@ -565,7 +565,7 @@ d
         <mesh filename="package://ugv_description/meshes/ugv_beast/pt_base_link.stl" />
       </geometry>
       <material name="">
-        <color rgba="0.627450980392157 0.627450980392157 0.627450980392157 1" />
+        <color rgba="1 0 0 1" />
       </material>
     </visual>
     <collision>
@@ -593,7 +593,7 @@ d
         <mesh filename="package://ugv_description/meshes/ugv_beast/pt_link1.stl" />
       </geometry>
       <material name="">
-        <color rgba="0.627450980392157 0.627450980392157 0.627450980392157 1" />
+        <color rgba="1 0 0 1" />
       </material>
     </visual>
     <collision>
@@ -622,7 +622,7 @@ d
         <mesh filename="package://ugv_description/meshes/ugv_beast/pt_link2.stl" />
       </geometry>
       <material name="">
-        <color rgba="0.627450980392157 0.627450980392157 0.627450980392157 1" />
+        <color rgba="1 0 0 1" />
       </material>
     </visual>
     <collision>
@@ -651,7 +651,7 @@ d
         <mesh filename="package://ugv_description/meshes/ugv_beast/pt_camera_link.stl" />
       </geometry>
       <material name="">
-        <color rgba="0.627450980392157 0.627450980392157 0.627450980392157 1" />
+        <color rgba="1 0 0 1" />
       </material>
     </visual>
     <collision>

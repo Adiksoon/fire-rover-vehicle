@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = "fire_rover_gazebo"
+package_name = "fire_rover_slam"
 
 setup(
     name=package_name,
@@ -9,15 +9,6 @@ setup(
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
-        ("share/" + package_name + "/launch", ["launch/sim.launch.py"]),
-        ("share/" + package_name + "/worlds", ["worlds/lidar_test.world"]),
-        (
-            "share/" + package_name + "/config",
-            [
-                "config/slam.yaml",
-                "config/ekf.yaml",
-            ],
-        ),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
@@ -31,6 +22,8 @@ setup(
         ],
     },
     entry_points={
-        "console_scripts": [],
+        "console_scripts": [
+            "slam_debug_node = fire_rover_slam.slam_debug_node:main",
+        ],
     },
 )
