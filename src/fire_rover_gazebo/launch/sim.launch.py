@@ -3,7 +3,15 @@ from launch.actions import DeclareLaunchArgument, ExecuteProcess, TimerAction
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 from launch_ros.actions import Node
+from launch_ros.actions import SetParameter
+from launch.substitutions import Command
+from launch_ros.parameter_descriptions import ParameterValue
+
+
 def generate_launch_description():
+
+    set_sim_time = SetParameter(name="use_sim_time", value=True)
+
     world_arg = DeclareLaunchArgument(
         "world",
         default_value="lidar_test.world",
@@ -47,6 +55,21 @@ def generate_launch_description():
         output="screen",
     )
 
+    robot_state_publisher = Node(
+        package="robot_state_publisher",
+        executable="robot_state_publisher",
+        name="robot_state_publisher",
+        output="screen",
+        parameters=[
+            {
+                "robot_description": ParameterValue(
+                    Command(["cat ", urdf_path]), value_type=str
+                )
+            }
+        ],
+    )
+
+    joint_state_bridge_arg = "/joint_states@sensor_msgs/msg/JointState[gz.msgs.Model"
     bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
@@ -57,8 +80,25 @@ def generate_launch_description():
             "/imu@sensor_msgs/msg/Imu[gz.msgs.IMU",
             "/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry",
             "/tf@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V",
+            joint_state_bridge_arg,
         ],
         output="screen",
+    )
+    ekf_config = PathJoinSubstitution(
+        [FindPackageShare("fire_rover_gazebo"), "config", "ekf.yaml"]
+    )
+
+    ekf_node = Node(
+        package="robot_localization",
+        executable="ekf_node",
+        name="ekf_filter_node",
+        output="screen",
+        parameters=[ekf_config],
+    )
+
+    delayed_ekf = TimerAction(
+        period=10.0,
+        actions=[ekf_node],
     )
 
     delayed_spawn = TimerAction(
@@ -68,9 +108,12 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
+            set_sim_time,
             world_arg,
             world_name_arg,
             gazebo,
+            robot_state_publisher,
             delayed_spawn,
+            delayed_ekf,
         ]
     )
