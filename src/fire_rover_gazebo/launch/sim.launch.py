@@ -1,3 +1,7 @@
+import os
+os.environ['LD_LIBRARY_PATH'] = '/opt/ros/humble/lib'
+os.environ['QT_QPA_PLATFORM'] = 'xcb'
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, TimerAction
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
@@ -79,7 +83,6 @@ def generate_launch_description():
             "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
             "/imu@sensor_msgs/msg/Imu[gz.msgs.IMU",
             "/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry",
-            "/tf@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V",
             joint_state_bridge_arg,
         ],
         output="screen",
