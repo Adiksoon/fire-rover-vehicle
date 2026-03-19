@@ -1,0 +1,11 @@
+# ||bt_navigator:
+ros-__parameters:
+  use_sim_time: true
+  global_frame: "map"
+  robot_base_frame: "base_footprint"
+  odom_topic: "/odom"
+  scan_topic: "/lidar_scan"
+
+  bt_loop_duration: 10
+  default_server_timeout: 20
+  wait_for_service_timeout: 1000
