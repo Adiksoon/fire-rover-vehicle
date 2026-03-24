@@ -1,5 +1,4 @@
 import math
-
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
@@ -10,6 +9,7 @@ from tf2_ros import Buffer, TransformListener
 from rclpy.time import Time
 from tf_transformations import quaternion_from_euler
 from time import time
+from collections import deque
 
 
 class GoalSender(Node):
@@ -44,7 +44,6 @@ class GoalSender(Node):
         # Sprawdzamy stan robota
         if self.robot_is_busy:
             return
-        frontiers = []
 
         # Pobieramy aktualną pozycję robota + TF map -> base_footprint
         self.map_data = msg
@@ -60,35 +59,129 @@ class GoalSender(Node):
 
         robot_x = transform.transform.translation.x
         robot_y = transform.transform.translation.y
+        origin_x = msg.info.origin.position.x
+        origin_y = msg.info.origin.position.y
+        resolution = msg.info.resolution
 
-        # Algorytm wykrywania frontierów
+        # BFS osiągalność
+        rx = int((robot_x - origin_x) / resolution)
+        ry = int((robot_y - origin_y) / resolution)
+        reachable = set()
+        bfs_queue = deque([(rx, ry)])
+        reachable.add((rx, ry))
+
+        while bfs_queue:
+            cx, cy = bfs_queue.popleft()
+
+            for dx in [-1, 0, 1]:
+                for dy in [-1, 0, 1]:
+
+                    nx = cx + dx
+                    ny = cy + dy
+
+                    if nx < 0 or ny < 0 or nx >= width or ny >= height:
+                        continue
+
+                    if (nx, ny) in reachable:
+                        continue
+
+                    index = ny * width + nx
+
+                    if data[index] != 0:
+                        continue
+
+                    reachable.add((nx, ny))
+                    bfs_queue.append((nx, ny))
+
+                # Algorytm wykrywania frontierów
+
+        frontiers = []
+
         for y in range(height):
             for x in range(width):
                 index = y * width + x
                 cell = data[index]
                 if cell == 0:  # sprawdzamy tylko wolne komórki
                     # Sprawdzamy, czy dana wolna komórka jest frontierem tzn. sąsiąd ma wartość -1
-                    if self.has_unknown_neighbor(x, y, data, width, height):
+                    if self.has_unknown_neighbor(
+                        x, y, data, width, height
+                    ) and self.is_safe_cell(x, y, data, width, height):
                         frontiers.append((x, y))
 
         if not frontiers:
             self.get_logger().info("Eksploracja zakonczona!")
             return
 
-        # Wybieramy najlepszy frontier jako cel (najbliższy robotowi)
-        best = None
-        min_dist = float("inf")
+        # Grupujemy frontier w klastry (sąsiadujące ze sobą frontiers traktujemy jako jeden cel)
+        visited = set()
+        frontier_set = set(frontiers)
+        clusters = []
 
         for point in frontiers:
-            fx = point[0]
-            fy = point[1]
+            if point in visited:
+                continue
+            cluster = []
+            queue = deque([point])
+            visited.add(point)
+
+            while queue:
+                current = queue.popleft()
+                cluster.append(current)
+                cx, cy = current
+                for dx in [-1, 0, 1]:
+                    for dy in [-1, 0, 1]:
+                        nx = cx + dx
+                        ny = cy + dy
+                        neighbor = (nx, ny)
+
+                        if neighbor in frontier_set and neighbor not in visited:
+                            visited.add(neighbor)
+                            queue.append(neighbor)
+
+            if len(cluster) >= 20:
+                clusters.append(cluster)
+
+        self.get_logger().info(f"Liczba clusterów: {len(clusters)}")
+
+        # Dla każdego klastra obliczamy jego centroid i traktujemy go jako potencjalny cel
+        best = None
+        best_score = float("-inf")
+
+        for cluster in clusters:
+            # Filtrujemy klastry, które nie są osiągalne przez robota
+            cluster_reachable = [p for p in cluster if p in reachable]
+            if not cluster_reachable:
+                continue
+
+            best_point = min(
+                cluster_reachable,
+                key=lambda p: math.hypot(
+                    msg.info.origin.position.x
+                    + (p[0] + 0.5) * msg.info.resolution
+                    - robot_x,
+                    msg.info.origin.position.y
+                    + (p[1] + 0.5) * msg.info.resolution
+                    - robot_y,
+                ),
+            )
+
             # Konwersja GRID -> ŚWIAT
-            wx = msg.info.origin.position.x + (fx + 0.5) * msg.info.resolution
-            wy = msg.info.origin.position.y + (fy + 0.5) * msg.info.resolution
+            wx = (
+                msg.info.origin.position.x + (best_point[0] + 0.5) * msg.info.resolution
+            )
+            wy = (
+                msg.info.origin.position.y + (best_point[1] + 0.5) * msg.info.resolution
+            )
 
             dist = math.hypot(wx - robot_x, wy - robot_y)
-            if dist < min_dist and dist > 0.3:
-                min_dist = dist
+
+            score = len(cluster_reachable) - dist * 0.5
+
+            if dist < 1.0:  # ignorujemy cele zbyt blisko robota
+                continue
+
+            if score > best_score:
+                best_score = score
                 best = (wx, wy)
 
         if best is None:
@@ -146,11 +239,27 @@ class GoalSender(Node):
                     continue
 
                 index = ny * width + nx
-
                 if data[index] == -1:
                     return True
 
         return False
+
+    def is_safe_cell(self, x, y, data, width, height):
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+
+                nx = x + dx
+                ny = y + dy
+
+                if nx < 0 or ny < 0 or nx >= width or ny >= height:
+                    continue
+
+                index = ny * width + nx
+
+                if data[ny * width + nx] == 100:  # zajęta komórka
+                    return False
+
+        return True
 
 
 def main(args=None):
