@@ -11,6 +11,9 @@ from tf2_ros import Buffer, TransformListener
 from rclpy.time import Time
 from action_msgs.msg import GoalStatus
 from visualization_msgs.msg import Marker, MarkerArray
+from geometry_msgs.msg import Twist, Point
+from std_msgs.msg import Bool
+
 
 class GoalSender(Node):
 
@@ -21,12 +24,18 @@ class GoalSender(Node):
         self._action_client = ActionClient(self, NavigateToPose, "/navigate_to_pose")
 
         # SUBSKRYBENCI
-        self.map_subscriber = self.create_subscription(
+        self.map_sub = self.create_subscription(
             OccupancyGrid, "/map", self.map_callback, 10
         )
 
+        self.flag_sub=self.create_subscription(Bool, "/flag", self.flag_callback, 10)
+
+        self.error_sub=self.create_subscription(Point, "/error_xy", self.error_callback, 10)
+
         # PUBLIKATORY
         self.marker_pub = self.create_publisher(MarkerArray, "/frontiers_markers", 10)
+
+        self.cmd_vel_pub=self.create_publisher(Twist, "/cmd_vel", 10)
 
         # INICJALIZACJA
         self.get_logger().info("Czekam na serwer action... ")
@@ -37,12 +46,7 @@ class GoalSender(Node):
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
         self.latest_map = None
-
-        # INICJALIZACJA STANU ROBOTA
-        self.current_goal = None
-        self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self)
-        self.latest_map = None
+        self.flag=False
 
         # ZABEZPIECZENIE
         self.goal_uuid = 0
@@ -55,8 +59,47 @@ class GoalSender(Node):
         # pobieranie najnowszej iteracji mapy
         self.latest_map = msg
 
+    def flag_callback(self, msg):
+        # Sprawdzamy czy wizjoner YOLO u góry akurat nie przerwał nadawania (Opadanie flagi na fałsz = cel zniknął pod światło!)
+        if self.flag == True and msg.data == False:
+            # MAGIA HAMOWANIA ROS2! Wcisnij wirtualny pedał na Zero (Zaneguj Coasting)
+            stop_msg = Twist()
+            self.cmd_vel_pub.publish(stop_msg)
+            
+        self.flag = msg.data
+
+    def error_callback(self, msg):
+
+        if self.flag == False:
+            return
+
+        self.error_x = msg.x
+        self.error_y = msg.y
+
+        twist_msg = Twist()
+
+        if self.error_x != 0.0:
+            # Prawdziwa Regulacja Proporcjonalna = pojedyncze przemnożenie. Gdy "X" wynosi -300, minusy się zniosą i obrót skręci kołami genialnie na dodatnie 1.5! Użyłem gładkiego kąta 0.005.
+            twist_msg.angular.z = -0.005 * self.error_x
+
+        # Wyrzuciliśmy ostateczne strzelanie na dno poza nawias z IF'ów, teraz to hamulec naturalnie blokuje koła. Kręć wózkiem do celu!
+        self.cmd_vel_pub.publish(twist_msg)
+
+
+
+
+
+
+
+
     def exploration_loop(self):
-        # awaryjne zrzucenie kalkulacji, o ile subskrybent nie dostarczył pierwszego obrazu z LiDARA
+
+
+        if self.flag==True:
+            return
+
+
+         # awaryjne zrzucenie kalkulacji, o ile subskrybent nie dostarczył pierwszego obrazu z LiDARA
         if self.latest_map is None:
             self.get_logger().warn("Brak mapy")
             return

@@ -27,13 +27,17 @@ class SearchDetectorNode(Node):
         self.model=YOLO("yolov8n.pt")
 
     def raw_callback(self, msg):
+        error_x=0.0
+        error_y=0.0
+
         try:
             cv_image=self.bridge.imgmsg_to_cv2(msg, "bgr8")
         except CvBridgeError as e:
             self.get_logger().error(f"Błąd konwersji obrazu: {e}")
             return
 
-        results=self.model(cv_image, conf=0.2, verbose=False)
+        # Zwracamy potężny Confidence dla modelu Oteksturowanego! Tnie pomyłki w Gazebo.
+        results=self.model(cv_image, conf=0.45, verbose=False)
 
         if len(results)>0:
             result=results[0]
@@ -42,10 +46,12 @@ class SearchDetectorNode(Node):
         for box in result.boxes:
             cls=int(box.cls[0])
 
-            if cls == 32:
+            # Klasa 11 to potężnie znany dla YOLOv8 "Stop sign". Idealny cel dla symulatora!
+            if cls == 11:
                 cx,cy,w,h = box.xywh[0]
-                error_x= cx - 640.0
-                error_y= cy - 360.0
+
+                error_x= float(cx.item()) - 640.0
+                error_y= float(cy.item()) - 360.0
                 self.flag=True
 
         msg=Point()
@@ -57,8 +63,12 @@ class SearchDetectorNode(Node):
         msg_flaga.data=self.flag
         self.flag_pub.publish(msg_flaga)
 
-        self.flag=False
-        cv2.imshow("Detekcja", cv_image)
+
+        cv2.imshow("Detekcja", result.plot())
+        cv2.waitKey(1)
+
+    def info_callback(self, msg):
+        pass
 
 
 def main(args=None):
