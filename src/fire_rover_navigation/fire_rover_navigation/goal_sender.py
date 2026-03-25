@@ -112,8 +112,14 @@ class GoalSender(Node):
             self.get_logger().info("Brak solidnego frontiera (wyłącznie szum)")
             return
 
-        # wyznacznik fizycznych Środków Ciężkości względem punktów 2D
-        centroids = ndimage.center_of_mass(frontiers_mask, labeled_frontiers, valid_cluster_ids)
+        # Wyznacznik punktów reprezentatytwnych (Zamiast rzucać Center_Of_Mass, bierzemy piksel Z LINII, by uniknąć środka w kształcie rogalika)
+        centroids = []
+        for c_id in valid_cluster_ids:
+            # Wyciągnij koordynaty wszystkich pikseli nalezacych do tego jednego Klastra
+            points = np.argwhere(labeled_frontiers == c_id)
+            # Wybierz piksel leżący dokładnie "w połowie" namierzonej krawędzi:
+            mid_idx = len(points) // 2
+            centroids.append((points[mid_idx][0], points[mid_idx][1]))
 
         best_score = float("-inf")
         best_world_x = None
