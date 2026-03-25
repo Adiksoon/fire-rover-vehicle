@@ -685,7 +685,7 @@
 <gazebo reference="pt_camera_link">
   <sensor name="Wide-Angle Camera" type="camera">
     <!-- Obrót soczewki o 90 stopni (Roll) względem osi X naprawiający pion. Zmień na -1.5708 (jeśli obraz wyjdzie do góry nogami) -->
-    <pose>0 0 0.08 1.5708 0 0</pose>
+    <pose>0 0 0.08 1.5707 -1.5708 0 </pose>
     <visualize>true</visualize>
 
     <update_rate>15.0</update_rate>

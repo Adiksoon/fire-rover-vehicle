@@ -24,6 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'search_detector_node = fire_rover_perception.search_detector_node:main'
         ],
     },
 )

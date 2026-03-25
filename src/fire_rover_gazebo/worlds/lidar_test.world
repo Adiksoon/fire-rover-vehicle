@@ -705,5 +705,32 @@
           </material>
         </visual>
       </link>
-    </model>  </world>
+    </model>
+
+    <!-- TESTOWE OBIEKTY DLA SZTUCZNEJ INTELIGENCJI YOLO -->
+    <!-- Piłka z jaskrawym pomarańczowym odcieniem (rozmiar siatkowy: promień 15cm) -->
+    <model name="sports_ball">
+      <static>false</static>
+      <!-- Położona równo przed punktem spawnu robota = (2m na wschód) -->
+      <pose>1.0 1.0 0.15 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <sphere><radius>0.15</radius></sphere>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <sphere><radius>0.15</radius></sphere>
+          </geometry>
+          <material>
+            <!-- Kolor typowy dla piłki do koszykówki / pachołka ułatwiający rozpoznanie sieci COCO -->
+            <ambient>1.0 0.4 0.0 1</ambient>
+            <diffuse>1.0 0.4 0.0 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+  </world>
 </sdf>
