@@ -17,33 +17,38 @@ class GoalSender(Node):
     def __init__(self):
         super().__init__("goal_sender")
 
-        # tworzymy klienta action do komend Nav2
+        # TWORZENIE KLIENTA ACTION
         self._action_client = ActionClient(self, NavigateToPose, "/navigate_to_pose")
 
-        # subskrybujemy mapę globalną
+        # SUBSKRYBENCI
         self.map_subscriber = self.create_subscription(
             OccupancyGrid, "/map", self.map_callback, 10
         )
 
-        # publikator markerów do RViza
+        # PUBLIKATORY
         self.marker_pub = self.create_publisher(MarkerArray, "/frontiers_markers", 10)
 
-        # czekamy na serwer action
+        # INICJALIZACJA
         self.get_logger().info("Czekam na serwer action... ")
         self._action_client.wait_for_server()
 
-        # inicjalizacja stanu robota
+        # INICJALIZACJA STANU ROBOTA
         self.current_goal = None
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
-
         self.latest_map = None
 
-        # ochrona asynchroniczna przed duchami celów (Blacklist & Preemption)
+        # INICJALIZACJA STANU ROBOTA
+        self.current_goal = None
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.latest_map = None
+
+        # ZABEZPIECZENIE
         self.goal_uuid = 0
         self.blacklist = []
 
-        # powołanie Timera analizującego nową mapę co 2 sekundy (zastępuje wywołanie z callbacka mapy)
+        # POWOŁANIE TIMERA
         self.exploration_timer = self.create_timer(2.0, self.exploration_loop)
 
     def map_callback(self, msg):
