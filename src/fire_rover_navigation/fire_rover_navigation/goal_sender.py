@@ -1,4 +1,5 @@
 import math
+
 import rclpy
 import numpy as np
 import scipy.ndimage as ndimage
@@ -28,14 +29,16 @@ class GoalSender(Node):
             OccupancyGrid, "/map", self.map_callback, 10
         )
 
-        self.flag_sub=self.create_subscription(Bool, "/flag", self.flag_callback, 10)
+        self.flag_sub = self.create_subscription(Bool, "/flag", self.flag_callback, 10)
 
-        self.error_sub=self.create_subscription(Point, "/error_xy", self.error_callback, 10)
+        self.error_sub = self.create_subscription(
+            Point, "/error_xy", self.error_callback, 10
+        )
 
         # PUBLIKATORY
         self.marker_pub = self.create_publisher(MarkerArray, "/frontiers_markers", 10)
 
-        self.cmd_vel_pub=self.create_publisher(Twist, "/cmd_vel", 10)
+        self.cmd_vel_pub = self.create_publisher(Twist, "/cmd_vel", 10)
 
         # INICJALIZACJA
         self.get_logger().info("Czekam na serwer action... ")
@@ -46,60 +49,74 @@ class GoalSender(Node):
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
         self.latest_map = None
-        self.flag=False
-
+        self.flag = False
+        self.active_goal_handle = None
+        self.r_trig = RTrig()
+        self.done = False
+        self.error_x = 0.0
         # ZABEZPIECZENIE
         self.goal_uuid = 0
         self.blacklist = []
 
         # POWOŁANIE TIMERA
-        self.exploration_timer = self.create_timer(2.0, self.exploration_loop)
+        self.state_update = self.create_timer(1.0, self.machine_states)
+
+    # CALLBACKS
 
     def map_callback(self, msg):
         # pobieranie najnowszej iteracji mapy
         self.latest_map = msg
 
     def flag_callback(self, msg):
-        # Sprawdzamy czy wizjoner YOLO u góry akurat nie przerwał nadawania (Opadanie flagi na fałsz = cel zniknął pod światło!)
-        if self.flag == True and msg.data == False:
-            # MAGIA HAMOWANIA ROS2! Wcisnij wirtualny pedał na Zero (Zaneguj Coasting)
-            stop_msg = Twist()
-            self.cmd_vel_pub.publish(stop_msg)
-            
+
         self.flag = msg.data
 
-    def error_callback(self, msg):
+        if self.r_trig.update(self.flag):
+            if self.active_goal_handle:
+                self.active_goal_handle.cancel_goal_async()
+            self.current_goal = None
+            self.done = False
+            self.stop()
 
-        if self.flag == False:
-            return
+    def error_callback(self, msg):
 
         self.error_x = msg.x
         self.error_y = msg.y
 
-        twist_msg = Twist()
+    # STATES
 
-        if self.error_x != 0.0:
-            # Prawdziwa Regulacja Proporcjonalna = pojedyncze przemnożenie. Gdy "X" wynosi -300, minusy się zniosą i obrót skręci kołami genialnie na dodatnie 1.5! Użyłem gładkiego kąta 0.005.
-            twist_msg.angular.z = -0.005 * self.error_x
+    def machine_states(self):
 
-        # Wyrzuciliśmy ostateczne strzelanie na dno poza nawias z IF'ów, teraz to hamulec naturalnie blokuje koła. Kręć wózkiem do celu!
-        self.cmd_vel_pub.publish(twist_msg)
+        if self.flag == True:
+            self.stop()
+            if self.done == True:
+                self.center_target(self.error_x)
+        else:
+            self.exploration_loop()
 
+    def center_target(self, x):
 
+        if abs(self.error_x) > 50:
+            twist_msg = Twist()
+            twist_msg.angular.z = -0.005 * x
+            self.cmd_vel_pub.publish(twist_msg)
 
+    def stop(self):
 
-
-
-
+        if not self.done:
+            twist_msg = Twist()
+            twist_msg.linear.x = 0
+            twist_msg.linear.y = 0
+            twist_msg.linear.z = 0
+            twist_msg.angular.x = 0
+            twist_msg.angular.y = 0
+            twist_msg.angular.z = 0
+            self.cmd_vel_pub.publish(twist_msg)
+            self.done = True
 
     def exploration_loop(self):
 
-
-        if self.flag==True:
-            return
-
-
-         # awaryjne zrzucenie kalkulacji, o ile subskrybent nie dostarczył pierwszego obrazu z LiDARA
+        # awaryjne zrzucenie kalkulacji, o ile subskrybent nie dostarczył pierwszego obrazu z LiDARA
         if self.latest_map is None:
             self.get_logger().warn("Brak mapy")
             return
@@ -124,7 +141,9 @@ class GoalSender(Node):
 
         # blokada preempcji: Timer nie wrzuci nowego celu, jeśli fizyczna podróż do obecnego ma pow. 1.0 metra odległości
         if self.current_goal is not None:
-            dist_to_goal = math.hypot(self.current_goal[0] - robot_x, self.current_goal[1] - robot_y)
+            dist_to_goal = math.hypot(
+                self.current_goal[0] - robot_x, self.current_goal[1] - robot_y  # type: ignore
+            )
             if dist_to_goal > 1.0:
                 return
 
@@ -132,29 +151,35 @@ class GoalSender(Node):
         grid = np.array(data, dtype=np.int8).reshape((height, width))
 
         # definiowanie fizycznych masek
-        free_space = (grid == 0)
-        unknown_space = (grid == -1)
-        obstacles = (grid == 100)
+        free_space = grid == 0
+        unknown_space = grid == -1
+        obstacles = grid == 100
 
         # DYLATACJA: Ochronne "nadmuchiwanie" nieznanych rogów i strefy zderzeniowej ścian (promień wyznaczony w symulatorze poprzez iterations)
         unknown_expanded = ndimage.binary_dilation(unknown_space)
         obstacles_expanded = ndimage.binary_dilation(obstacles, iterations=8)
 
         # wycięcie ostatecznych Krawędzi Półmroku (frontiers) matematycznie wykluczając strefy zablokowane
-        frontiers_mask = free_space & unknown_expanded & ~obstacles_expanded
+        frontiers_mask = free_space & unknown_expanded & ~obstacles_expanded  # type: ignore
 
         # zlecenie odnalezienia klastrów
-        labeled_frontiers, num_clusters = ndimage.label(frontiers_mask)
+        labeled_frontiers, num_clusters = ndimage.label(frontiers_mask)  # type: ignore
 
         if num_clusters == 0:
-            self.get_logger().info("Brak frontiera - misja badawcza zakończona (albo pokój staje się więzieniem)  🛑")
+            self.get_logger().info(
+                "Brak frontiera - misja badawcza zakończona (albo pokój staje się więzieniem)  🛑"
+            )
             return
 
         # sumaryczne podliczenie rozmiarów (pikseli w długości powłoki) wszystkich powiązanych klastrów
-        cluster_sizes = ndimage.sum(frontiers_mask, labeled_frontiers, range(1, num_clusters + 1))
+        cluster_sizes = ndimage.sum(
+            frontiers_mask, labeled_frontiers, range(1, num_clusters + 1)
+        )
 
         # filtracja zakłóceń z liDara - szukaj dziur wielkości pow. dwudziestu pikseli
-        valid_cluster_ids = [i + 1 for i, size in enumerate(cluster_sizes) if size >= 20]
+        valid_cluster_ids = [
+            i + 1 for i, size in enumerate(cluster_sizes) if size >= 20
+        ]
 
         if not valid_cluster_ids:
             self.get_logger().info("Brak solidnego frontiera (wyłącznie szum)")
@@ -198,7 +223,7 @@ class GoalSender(Node):
             # SYSTEM OCENY CELA: Klaster duży dostaje punkty, dystans podniesiony do kwadratu miażdży wyniki, by faworyzować najbliższe terytorium do roboty
             c_id = valid_cluster_ids[idx]
             size = cluster_sizes[c_id - 1]
-            score = size / (dist_to_robot ** 2)
+            score = size / (dist_to_robot**2)
 
             if score > best_score:
                 best_score = score
@@ -207,16 +232,22 @@ class GoalSender(Node):
 
         # blokada błędów logicznych, gdy żaden z dystansowych celów się po pętli NIE nadda
         if best_world_x is None:
-            self.get_logger().info("Frontiery uśmiercone z braku racjonalnej odległości lub w skutek wpisania do Czarnej Listy")
+            self.get_logger().info(
+                "Frontiery uśmiercone z braku racjonalnej odległości lub w skutek wpisania do Czarnej Listy"
+            )
             return
 
         world_x = best_world_x
         world_y = best_world_y
 
-        self.get_logger().info(f"Wybrano idealnego Frontiera (Nagroda max): ({world_x:.2f}, {world_y:.2f})")
+        self.get_logger().info(
+            f"Wybrano idealnego Frontiera (Nagroda max): ({world_x:.2f}, {world_y:.2f})"
+        )
 
         # publikacja zsynchronizowanego układu markerów dla okienka RViz
-        self.publish_markers(centroids, origin_x, origin_y, resolution, world_x, world_y)
+        self.publish_markers(
+            centroids, origin_x, origin_y, resolution, world_x, world_y
+        )
 
         # kompilacja zlecenia nawigacji preempcyjnej do sterownika Nav2_Client
         goal_msg = NavigateToPose.Goal()
@@ -226,8 +257,8 @@ class GoalSender(Node):
         goal_msg.pose.pose.position.y = world_y
 
         # pozycjonowanie wózka prostopadle na wyliczony horyzont
-        yaw = math.atan2(world_y - robot_y, world_x - robot_x)
-        q = R.from_euler('z', yaw).as_quat()
+        yaw = math.atan2(world_y - robot_y, world_x - robot_x)  # type: ignore
+        q = R.from_euler("z", yaw).as_quat()
         goal_msg.pose.pose.orientation.x = q[0]
         goal_msg.pose.pose.orientation.y = q[1]
         goal_msg.pose.pose.orientation.z = q[2]
@@ -238,14 +269,19 @@ class GoalSender(Node):
         self.goal_uuid += 1
         current_id = self.goal_uuid
 
-        self.result_future = self._action_client.send_goal_async(goal_msg)
-        self.result_future.add_done_callback(lambda future: self.goal_response_callback(future, current_id))
+        self.result_future = self._action_client.send_goal_async(
+            goal_msg, feedback_callback=self.feedback_callback
+        )
+        self.result_future.add_done_callback(
+            lambda future: self.goal_response_callback(future, current_id)
+        )
 
     def goal_response_callback(self, future, current_id):
         # odpowiedź z sieci serwera - odbiór kurierski od Nav2
         goal_handle = future.result()
         if not goal_handle.accepted:
             self.get_logger().info("Goal odrzucony u Kuriera w połowie lotu ❌")
+            self.active_goal_handle = None
 
             # Wpisujemy cel natychmiast na Czarną Listę by zapomnieć go na zawsze
             if self.current_goal is not None:
@@ -257,10 +293,14 @@ class GoalSender(Node):
             return
 
         self.get_logger().info("Goal zaakceptowany przez mózg Nav2 ✅")
+        self.active_goal_handle = goal_handle
+
         self.result_future = goal_handle.get_result_async()
 
         # po zaakceptowaniu, wieszamy asynchroniczną pętlę wyrokową...
-        self.result_future.add_done_callback(lambda future: self.get_result_callback(future, current_id))
+        self.result_future.add_done_callback(
+            lambda future: self.get_result_callback(future, current_id)
+        )
 
     def get_result_callback(self, future, current_id):
         status = future.result().status
@@ -270,21 +310,29 @@ class GoalSender(Node):
             self.get_logger().info("Hura! Dotarłem do celu! Frontiery odkryto. 🎯")
         else:
             # jeżeli zdarzył się dramat w trakcie jazdy (wspomniany słynny Status 6) wózek wyrzuci błąd Nav2. Oznaczamy skazany teren do Zeszytu Czarnej Lity. ☠️
-            self.get_logger().warn(f"!!! TRASA ZERWANA W TRAKCIE !!! Nav2 wypluł się błędem (np. 6 = ABORTED): {status}")
+            self.get_logger().warn(
+                f"!!! TRASA ZERWANA W TRAKCIE !!! Nav2 wypluł się błędem (np. 6 = ABORTED): {status}"
+            )
             if self.current_goal is not None:
                 self.blacklist.append(self.current_goal)
 
         # OCHRONA PRZED PREEMPCJĄ: Nawet jeśli wózek się rozbił ze statusem 6, wyczyścimy "obecny cel", Z WYJĄTKIEM sytuacji gdy zdążyliśmy wbić się w timer z Nowym Celem z ID!
         if current_id == self.goal_uuid:
             self.current_goal = None
+            self.active_goal_handle = None
 
-    def publish_markers(self, centroids, origin_x, origin_y, resolution, best_x, best_y):
+    def feedback_callback(self, feedback_msg):
+        pass
+
+    def publish_markers(
+        self, centroids, origin_x, origin_y, resolution, best_x, best_y
+    ):
         marker_array = MarkerArray()
 
         # 1. DELETE - Czyszczenie z monitorów starych, bezużytecznych już punktów (wycieraczka)
         delete_marker = Marker()
         delete_marker.action = Marker.DELETEALL
-        marker_array.markers.append(delete_marker)
+        marker_array.markers.append(delete_marker)  # type:ignore
 
         # 2. Rysowanie masowo wszystkich rozpatrywanych matematycznie przez kod centroidów klastra
         for i, (cy, cx) in enumerate(centroids):
@@ -309,8 +357,7 @@ class GoalSender(Node):
             marker.pose.position.y = origin_y + cy * resolution
             marker.pose.position.z = 0.0
 
-            marker_array.markers.append(marker)
-
+            marker_array.markers.append(marker)  # type:ignore
 
         best_marker = Marker()
         best_marker.header.frame_id = "map"
@@ -333,9 +380,19 @@ class GoalSender(Node):
         best_marker.pose.position.y = best_y
         best_marker.pose.position.z = 0.1
 
-        marker_array.markers.append(best_marker)
+        marker_array.markers.append(best_marker)  # type:ignore
 
         self.marker_pub.publish(marker_array)
+
+
+class RTrig:
+    def __init__(self):
+        self.prev = False
+
+    def update(self, signal):
+        triggered = not self.prev and signal
+        self.prev = signal
+        return triggered
 
 
 def main(args=None):

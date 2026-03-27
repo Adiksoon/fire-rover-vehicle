@@ -137,14 +137,15 @@
       </link>
     </model>
     <!-- ============================================== -->
-    <!-- OSTATECZNY POLIGON YOLO (MODEL OTEKSTUROWANY Z FUEL) -->
+    <!-- WIRTUALNA PIŁKA TURNIEJOWA (Baza OpenRobotics) -->
     <!-- ============================================== -->
 
-    <!-- Znak Stop z amerykańskiej bazy (Posiada wyrenderowane krawędzie, napisy i cień uv) -->
-    <!-- Ściągany przez Ignition Gazebo z chmury OpenRobotics przy pierwszym uruchomieniu -->
+    <!-- Wyśmienity model piłki gotowy i oteksturowany siatkami (Klasa 32 COCO: Sports Ball) -->
+    <!-- Ściągany przez Ignition Gazebo z chmury OpenRobotics bez błędu 404 -->
     <include>
-      <pose>2.5 0.0 0.0 0 0 -1.57</pose>
-      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Stop Sign</uri>
+      <pose>8 4 0 0 0 0</pose>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/RoboCup%203D%20Simulation%20Ball</uri>
+      <scale>10 10 10</scale>
     </include>
 
   </world>

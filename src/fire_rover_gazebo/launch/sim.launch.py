@@ -13,7 +13,6 @@ from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
-
     set_sim_time = SetParameter(name="use_sim_time", value=True)
 
     world_arg = DeclareLaunchArgument(
