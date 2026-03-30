@@ -13,7 +13,7 @@ from rclpy.time import Time
 from action_msgs.msg import GoalStatus
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Twist, Point
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, String
 
 
 class GoalSender(Node):
@@ -29,7 +29,13 @@ class GoalSender(Node):
             OccupancyGrid, "/map", self.map_callback, 10
         )
 
-        self.flag_sub = self.create_subscription(Bool, "/flag", self.flag_callback, 10)
+        self.flag_sub = self.create_subscription(
+            Bool, "/found_target_flag", self.flag_callback, 10
+        )
+
+        self.target_state_sub = self.create_subscription(
+            String, "/search_detector/target_state", self.state_callback, 10
+        )
 
         self.error_sub = self.create_subscription(
             Point, "/error_xy", self.error_callback, 10
@@ -54,12 +60,13 @@ class GoalSender(Node):
         self.r_trig = RTrig()
         self.done = False
         self.error_x = 0.0
+        self.target_state = "SEARCHING"
         # ZABEZPIECZENIE
         self.goal_uuid = 0
         self.blacklist = []
 
         # POWOŁANIE TIMERA
-        self.state_update = self.create_timer(1.0, self.machine_states)
+        self.state_update = self.create_timer(0.1, self.machine_states)
 
     # CALLBACKS
 
@@ -78,6 +85,9 @@ class GoalSender(Node):
             self.done = False
             self.stop()
 
+    def state_callback(self, msg):
+        self.target_state = msg.data
+
     def error_callback(self, msg):
 
         self.error_x = msg.x
@@ -87,11 +97,14 @@ class GoalSender(Node):
 
     def machine_states(self):
 
-        if self.flag == True:
+        if self.target_state in ["CONFIRMED", "CANDIDATE"]:
             self.stop()
-            if self.done == True:
-                self.center_target(self.error_x)
-        else:
+            self.get_logger().info(
+                "Znaleziono flagę! Zatrzymuję się i czekam na dalsze instrukcje... 🏁"
+            )
+            # if self.done == True:
+            #   self.center_target(self.error_x)
+        elif self.target_state == "SEARCHING":
             self.exploration_loop()
 
     def center_target(self, x):
@@ -115,6 +128,7 @@ class GoalSender(Node):
             self.done = True
 
     def exploration_loop(self):
+        self.done = False
 
         # awaryjne zrzucenie kalkulacji, o ile subskrybent nie dostarczył pierwszego obrazu z LiDARA
         if self.latest_map is None:

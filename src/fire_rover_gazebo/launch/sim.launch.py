@@ -50,7 +50,7 @@ def generate_launch_description():
             "-file",
             urdf_path,
             "-x",
-            "0.0",
+            "1.0",
             "-y",
             "0.0",
             "-z",
