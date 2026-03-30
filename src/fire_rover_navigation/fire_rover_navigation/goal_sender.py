@@ -1,11 +1,11 @@
 import math
 
 import rclpy
+from rclpy.node import Node
+from rclpy.action import ActionClient
 import numpy as np
 import scipy.ndimage as ndimage
 from scipy.spatial.transform import Rotation as R
-from rclpy.node import Node
-from rclpy.action import ActionClient
 from nav2_msgs.action import NavigateToPose
 from nav_msgs.msg import OccupancyGrid
 from tf2_ros import Buffer, TransformListener
@@ -105,12 +105,12 @@ class GoalSender(Node):
 
         if not self.done:
             twist_msg = Twist()
-            twist_msg.linear.x = 0
-            twist_msg.linear.y = 0
-            twist_msg.linear.z = 0
-            twist_msg.angular.x = 0
-            twist_msg.angular.y = 0
-            twist_msg.angular.z = 0
+            twist_msg.linear.x = 0.0
+            twist_msg.linear.y = 0.0
+            twist_msg.linear.z = 0.0
+            twist_msg.angular.x = 0.0
+            twist_msg.angular.y = 0.0
+            twist_msg.angular.z = 0.0
             self.cmd_vel_pub.publish(twist_msg)
             self.done = True
 

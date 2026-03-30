@@ -5,7 +5,7 @@ os.environ["QT_QPA_PLATFORM"] = "xcb"
 
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge
 import cv2
 from ultralytics import YOLO
@@ -22,7 +22,7 @@ class SearchDetectorNode(Node):
             Image, "/camera/image_raw", self.raw_callback, 10
         )
         self.photo_info_sub = self.create_subscription(
-            Image, "/camera/camera_info", self.info_callback, 10
+            CameraInfo, "/camera/camera_info", self.info_callback, 10
         )
 
         # PUBLIKACJE
@@ -35,13 +35,30 @@ class SearchDetectorNode(Node):
         ##ładowanie modeli
         self.model = YOLO("yolo26m.pt")
 
+        # ZEGAR WYWOŁUJĄCY METODE
+        self.state_update = self.create_timer(0.1, self.state_update_callback)
+
+    # CALLBACKS
+
     def raw_callback(self, msg):
+        self.latest_image = msg
+
+    def info_callback(self, msg):
+        pass
+
+    # METHODS
+
+    def state_update_callback(self):
+
+        if not hasattr(self, "latest_image"):
+            return
+
         self.flag = False
         error_x = 0.0
         error_y = 0.0
 
         try:
-            cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+            cv_image = self.bridge.imgmsg_to_cv2(self.latest_image, "bgr8")
         except Exception as e:
             self.get_logger().error(f"Błąd konwersji obrazu: {e}")
             return
@@ -74,11 +91,8 @@ class SearchDetectorNode(Node):
         msg_flaga.data = self.flag
         self.flag_pub.publish(msg_flaga)
 
-        cv2.imshow("Detekcja", result.plot())
+        cv2.imshow("Detekcja", results[0].plot())
         cv2.waitKey(1)
-
-    def info_callback(self, msg):
-        pass
 
 
 def main(args=None):

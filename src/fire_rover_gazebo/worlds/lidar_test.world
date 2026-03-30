@@ -87,63 +87,41 @@
     </model>
 
 
-    <!-- TESTOWE OBIEKTY DLA SZTUCZNEJ INTELIGENCJI YOLO -->
-    <!-- Wirtualna Zielona Butelka na ziemi dla YOLO klasa 39 (zastępuje piłkę) -->
-    <model name="green_beer_bottle">
-      <static>false</static>
-      <!-- Położenie na ziemi przed wózkiem -->
-      <pose>1.0 1.0 0.0 0 0 0</pose>
-      <link name="link">
-
-        <!-- Cześć główna butelki (grubszy walec korpusowy) -->
-        <collision name="base_collision">
-          <pose>0 0 0.1 0 0 0</pose>
-          <geometry><cylinder><radius>0.04</radius><length>0.2</length></cylinder></geometry>
-        </collision>
-        <visual name="base_visual">
-          <pose>0 0 0.1 0 0 0</pose>
-          <geometry><cylinder><radius>0.04</radius><length>0.2</length></cylinder></geometry>
-          <material>
-            <!-- Szklista, ciemna, chmielowa Zieleń dla datasetu COCO -->
-            <ambient>0.05 0.5 0.1 0.8</ambient>
-            <diffuse>0.05 0.5 0.1 0.8</diffuse>
-            <specular>0.1 0.9 0.2 0.8</specular>
-          </material>
-        </visual>
-
-        <!-- Szyjka butelki (cieńszy walec) -->
-        <collision name="neck_collision">
-          <pose>0 0 0.25 0 0 0</pose>
-          <geometry><cylinder><radius>0.015</radius><length>0.1</length></cylinder></geometry>
-        </collision>
-        <visual name="neck_visual">
-          <pose>0 0 0.25 0 0 0</pose>
-          <geometry><cylinder><radius>0.015</radius><length>0.1</length></cylinder></geometry>
-          <material>
-            <ambient>0.05 0.5 0.1 0.8</ambient>
-            <diffuse>0.05 0.5 0.1 0.8</diffuse>
-          </material>
-        </visual>
-
-        <!-- Środek ciężkości (nieodłączny dla złożonych obiektów fizycznych dynamicznych - unika przenikalności Gazebo w dno) -->
-        <inertial>
-          <mass>0.4</mass>
-          <pose>0 0 0.1 0 0 0</pose>
-          <inertia>
-            <ixx>0.001</ixx> <iyy>0.001</iyy> <izz>0.001</izz>
-          </inertia>
-        </inertial>
-
-      </link>
-    </model>
     <!-- ============================================== -->
-    <!-- WIRTUALNA PIŁKA TURNIEJOWA (Baza OpenRobotics) -->
+    <!-- WIRTUALNE PIŁKI TURNIEJOWE (Baza OpenRobotics) -->
     <!-- ============================================== -->
 
-    <!-- Wyśmienity model piłki gotowy i oteksturowany siatkami (Klasa 32 COCO: Sports Ball) -->
-    <!-- Ściągany przez Ignition Gazebo z chmury OpenRobotics bez błędu 404 -->
     <include>
+      <name>ball_1</name>
       <pose>8 4 0 0 0 0</pose>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/RoboCup%203D%20Simulation%20Ball</uri>
+      <scale>10 10 10</scale>
+    </include>
+
+    <include>
+      <name>ball_2</name>
+      <pose>4 -3 0 0 0 0</pose>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/RoboCup%203D%20Simulation%20Ball</uri>
+      <scale>10 10 10</scale>
+    </include>
+
+    <include>
+      <name>ball_3</name>
+      <pose>-5 2 0 0 0 0</pose>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/RoboCup%203D%20Simulation%20Ball</uri>
+      <scale>10 10 10</scale>
+    </include>
+
+    <include>
+      <name>ball_4</name>
+      <pose>-2 -6 0 0 0 0</pose>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/RoboCup%203D%20Simulation%20Ball</uri>
+      <scale>10 10 10</scale>
+    </include>
+
+    <include>
+      <name>ball_5</name>
+      <pose>1 6 0 0 0 0</pose>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/RoboCup%203D%20Simulation%20Ball</uri>
       <scale>10 10 10</scale>
     </include>

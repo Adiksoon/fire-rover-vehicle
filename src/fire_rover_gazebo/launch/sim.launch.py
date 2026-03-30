@@ -1,6 +1,7 @@
 import os
-os.environ['LD_LIBRARY_PATH'] = '/opt/ros/humble/lib'
-os.environ['QT_QPA_PLATFORM'] = 'xcb'
+
+os.environ["LD_LIBRARY_PATH"] = "/opt/ros/humble/lib"
+os.environ["QT_QPA_PLATFORM"] = "xcb"
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, TimerAction
@@ -85,6 +86,8 @@ def generate_launch_description():
             joint_state_bridge_arg,
             "/camera/image_raw@sensor_msgs/msg/Image[gz.msgs.Image",
             "/camera/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo",
+            "/pan_tilt/pan_cmd@std_msgs/msg/Float64]gz.msgs.Double",
+            "/pan_tilt/tilt_cmd@std_msgs/msg/Float64]gz.msgs.Double",
         ],
         output="screen",
     )
@@ -112,6 +115,13 @@ def generate_launch_description():
         parameters=[slam_config],
     )
 
+    pan_controller = Node(
+        package="fire_rover_perception",
+        executable="pan_tilt_controller_node",
+        name="pan_tilt_controller_node",
+        output="screen",
+    )
+
     delayed_spawn = TimerAction(
         period=5.0,
         actions=[spawn_robot, bridge],
@@ -119,7 +129,7 @@ def generate_launch_description():
 
     delayed_ekf_slam = TimerAction(
         period=15.0,
-        actions=[ekf_node, slam_node],
+        actions=[ekf_node, slam_node, pan_controller],
     )
 
     return LaunchDescription(

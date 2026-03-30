@@ -620,12 +620,13 @@
     </collision>
   </link>
 
-  <joint name="pt_base_link_to_pt_link1" type="revolute">
+  <joint name="pt_base_link_to_pt_link1" type="continuous">
     <origin xyz="0.010151 0 0.048" rpy="0 0 0" />
     <parent link="pt_base_link" />
     <child link="pt_link1" />
     <axis xyz="0 0 -1" />
-    <limit lower="-3.14" upper="3.14" effort="0" velocity="0" />
+    <limit effort="5.0" velocity="1.5" />
+    <dynamics damping="0.2" friction="0.05" />
   </joint>
 
   <link name="pt_link2">
@@ -656,7 +657,8 @@
     <parent link="pt_link1" />
     <child link="pt_link2" />
     <axis xyz="0 0 1" />
-    <limit lower="-0.5233333" upper="1.5707963" effort="0" velocity="0" />
+    <limit lower="-0.5233333" upper="1.5707963" effort="5.0" velocity="1.5" />
+    <dynamics damping="0.2" friction="0.05" />
   </joint>
 
   <link name="pt_camera_link">
@@ -682,38 +684,64 @@
     </collision>
   </link>
 
-<gazebo reference="pt_camera_link">
-  <sensor name="Wide-Angle Camera" type="camera">
-    <pose>0 0 0.08 1.5707 -1.5708 0 </pose>
-    <visualize>true</visualize>
-
-    <update_rate>15.0</update_rate>
-    <topic>camera/image_raw</topic>
-
-    <camera>
-      <horizontal_fov>1</horizontal_fov>
-      <!-- na testy ustawiam 1 radian, ale gdy przyjdzie fizyczny robot nalezy zwiększyć do 2.793 radiana (160 stopni) -->
-      <image>
-        <width>1920</width>
-        <height>1080</height>
-        <format>R8G8B8</format>
-      </image>
-      <clip>
-        <near>0.05</near>
-        <far>10.0</far>
-      </clip>
-    </camera>
-  </sensor>
-</gazebo>
-
-
-
-
-<joint name="pt_link2_to_pt_camera_link" type="fixed">
+  <joint name="pt_link2_to_pt_camera_link" type="fixed">
     <origin xyz="0.0476858338436577 -0.000568997109077291 0.0199999999999997" rpy="3.14 -1.5708 0" />
     <parent link="pt_link2" />
     <child link="pt_camera_link" />
     <axis xyz="0 0 0" />
   </joint>
+
+  <gazebo reference="pt_camera_link">
+    <sensor name="Wide-Angle Camera" type="camera">
+      <pose>0 0 0.08 1.5707 -1.5708 0 </pose>
+      <update_rate>10.0</update_rate>
+      <topic>camera/image_raw</topic>
+      <camera>
+        <horizontal_fov>1</horizontal_fov>
+        <!-- na testy ustawiam 1 radian, ale gdy przyjdzie fizyczny robot nalezy zwiększyć do 2.793 radiana (160 stopni) -->
+        <image>
+          <width>1920</width>
+          <height>1080</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.05</near>
+          <far>10.0</far>
+        </clip>
+      </camera>
+    </sensor>
+  </gazebo>
+
+  <gazebo>
+    <plugin
+      filename="ignition-gazebo-joint-position-controller-system"
+      name="gz::sim::systems::JointPositionController">
+      <joint_name>pt_base_link_to_pt_link1</joint_name>
+      <topic>/pan_tilt/pan_cmd</topic>
+      <p_gain>2.0</p_gain>
+      <i_gain>0.1</i_gain>
+      <d_gain>0.05</d_gain>
+      <i_max>1.0</i_max>
+      <i_min>-1.0</i_min>
+      <cmd_max>3.14</cmd_max>
+      <cmd_min>-3.14</cmd_min>
+    </plugin>
+  </gazebo>
+
+  <gazebo>
+    <plugin
+      filename="ignition-gazebo-joint-position-controller-system"
+      name="gz::sim::systems::JointPositionController">
+      <joint_name>pt_link1_to_pt_link2</joint_name>
+      <topic>/pan_tilt/tilt_cmd</topic>
+      <p_gain>2.0</p_gain>
+      <i_gain>0.1</i_gain>
+      <d_gain>0.05</d_gain>
+      <i_max>1.0</i_max>
+      <i_min>-1.0</i_min>
+      <cmd_max>1.047</cmd_max>
+      <cmd_min>-1.047</cmd_min>
+    </plugin>
+  </gazebo>
 
 </robot>
