@@ -30,7 +30,7 @@ class GoalSender(Node):
         )
 
         self.flag_sub = self.create_subscription(
-            Bool, "/found_target_flag", self.flag_callback, 10
+            Bool, "/search_detector/weak_target_flag", self.flag_callback, 10
         )
 
         self.target_state_sub = self.create_subscription(
