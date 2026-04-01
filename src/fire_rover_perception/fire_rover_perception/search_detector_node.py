@@ -38,23 +38,25 @@ class SearchDetectorNode(Node):
         self.state_pub = self.create_publisher(
             String, "/search_detector/target_state", 10
         )
-        # INICJALIZACJE
         self.bridge = CvBridge()
-        self.found_weak_flag = False
-        self.found_strong_flag = False
+        self.weak_flag = False
+        self.strong_flag = False
 
         self.target_state = "SEARCHING"
 
-        self.detected_count = 0
-        self.missed_count = 0
-        self.candidate_seen_strong_flag = False
+        # Globalne liczniki ciągłych klatek (Hits & Misses)
+        self.consecutive_hits = 0
+        self.consecutive_misses = 0
+        self.seen_strong = False
 
         self.strong_conf_threshold = 0.8
-        self.weak_conf_threshold = 0.5
+        self.weak_conf_threshold = 0.6
 
-        self.confirm_threshold = 5
-        self.candidate_missed_threshold = 7
-        self.lost_threshold = 50
+        self.search_confirm_threshold = 5     # Awans na kandydata (Odsiew Duchów)
+        self.focus_confirm_threshold = 10     # Awans na Focusa
+        self.candidate_missed_threshold = 75  # Spadek do szukania
+        self.focused_missed_threshold = 30    # Utrata Focusa
+        self.confirmed_missed_threshold = 150 # Utrata Confirmed
 
         self.model = YOLO("yolo26m.pt")
 
@@ -79,8 +81,8 @@ class SearchDetectorNode(Node):
 
         error_x = 0.0
         error_y = 0.0
-        self.found_weak_flag = False
-        self.found_strong_flag = False
+        self.weak_flag = False
+        self.strong_flag = False
 
         try:
             cv_image = self.bridge.imgmsg_to_cv2(self.latest_image, "bgr8")
@@ -102,11 +104,11 @@ class SearchDetectorNode(Node):
                 self.get_logger().info("Znaleziono słaby cel.")
                 error_x = float(cx.item()) - 960.0
 
-                self.found_weak_flag = True
+                self.weak_flag = True
 
                 if conf >= self.strong_conf_threshold:
                     self.get_logger().info("Znaleziono silny cel.")
-                    self.found_strong_flag = True
+                    self.strong_flag = True
 
                 break
 
@@ -116,11 +118,11 @@ class SearchDetectorNode(Node):
         self.error_pub.publish(msg)
 
         msg_weak_flag = Bool()
-        msg_weak_flag.data = self.found_weak_flag
+        msg_weak_flag.data = self.weak_flag
         self.found_weak_flag_pub.publish(msg_weak_flag)
 
         msg_strong_flag = Bool()
-        msg_strong_flag.data = self.found_strong_flag
+        msg_strong_flag.data = self.strong_flag
         self.found_strong_flag_pub.publish(msg_strong_flag)
 
         if result is not None:
@@ -129,49 +131,48 @@ class SearchDetectorNode(Node):
 
     def state_update(self):
         state_msg = String()
-        current_detected = self.found_weak_flag
 
-        if current_detected:
-            self.detected_count += 1
-            self.missed_count = 0
+        if self.weak_flag:
+            self.consecutive_hits += 1
+            self.consecutive_misses = 0
         else:
-            self.missed_count += 1
-            self.detected_count = 0
+            self.consecutive_misses += 1
+            self.consecutive_hits = 0
 
         if self.target_state == "SEARCHING":
-            if self.found_strong_flag:
-                self.target_state = "CANDIDATE"
-                self.detected_count = 1
-                self.missed_count = 0
-                self.candidate_seen_strong_flag = True
+            if self.weak_flag or self.strong_flag:
+                if self.consecutive_hits >= self.search_confirm_threshold:
+                    self.target_state = "CANDIDATE"
+                    self.consecutive_misses = 0
 
-        elif self.target_state == "CANDIDATE":
-            if self.found_strong_flag:
-                self.candidate_seen_strong_flag = True
+       elif self.target_state == "CANDIDATE":
+            if self.strong_flag:
+                self.seen_strong = True
 
-            if (
-                self.detected_count >= self.confirm_threshold
-                and self.candidate_seen_strong_flag
-            ):
-                self.target_state = "CONFIRMED"
-            elif self.missed_count >= self.candidate_missed_threshold:
+            if self.consecutive_hits >= self.focus_confirm_threshold and self.seen_strong:
+                self.target_state = "FOCUSED"
+                self.consecutive_misses = 0
+                self.seen_strong = False
+            elif self.consecutive_misses >= self.candidate_missed_threshold:
                 self.target_state = "SEARCHING"
-                self.candidate_seen_strong_flag = False
+                self.consecutive_misses = 0
+                self.seen_strong = False
+
+        elif self.target_state == "FOCUSED":
+            if self.strong_flag:
+                if self.consecutive_hits >= self.focus_confirm_threshold:
+                    self.target_state = "CONFIRMED"
+                    self.consecutive_misses = 0
+            elif self.consecutive_misses >= self.focused_missed_threshold:
+                self.target_state = "CANDIDATE"
+                self.consecutive_misses = 0
+                self.seen_strong = False
 
         elif self.target_state == "CONFIRMED":
-            if self.missed_count >= self.lost_threshold:
-                self.target_state = "LOST"
-                self.candidate_seen_strong_flag = False
-
-        elif self.target_state == "LOST":
-            if self.found_strong_flag:
+            if self.consecutive_misses >= self.confirmed_missed_threshold:
                 self.target_state = "CANDIDATE"
-                self.detected_count = 1
-                self.missed_count = 0
-                self.candidate_seen_strong_flag = True
-            elif self.missed_count >= self.lost_threshold:
-                self.target_state = "SEARCHING"
-                self.candidate_seen_strong_flag = False
+                self.consecutive_misses = 0
+                self.seen_strong = False
 
         state_msg.data = self.target_state
         self.state_pub.publish(state_msg)

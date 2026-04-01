@@ -14,6 +14,7 @@ from action_msgs.msg import GoalStatus
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Twist, Point
 from std_msgs.msg import Bool, String
+from sensor_msgs.msg import JointState
 
 
 class GoalSender(Node):
@@ -29,8 +30,12 @@ class GoalSender(Node):
             OccupancyGrid, "/map", self.map_callback, 10
         )
 
-        self.flag_sub = self.create_subscription(
-            Bool, "/search_detector/weak_target_flag", self.flag_callback, 10
+        self.strong_flag_sub = self.create_subscription(
+            Bool, "/search_detector/strong_target_flag", self.strong_flag_callback, 10
+        )
+
+        self.weak_flag_sub = self.create_subscription(
+            Bool, "/search_detector/weak_target_flag", self.weak_flag_callback, 10
         )
 
         self.target_state_sub = self.create_subscription(
@@ -46,6 +51,10 @@ class GoalSender(Node):
 
         self.cmd_vel_pub = self.create_publisher(Twist, "/cmd_vel", 10)
 
+        self.joint_state_sub = self.create_subscription(
+            JointState, "/joint_states", self.joint_states_callback, 10
+        )
+
         # INICJALIZACJA
         self.get_logger().info("Czekam na serwer action... ")
         self._action_client.wait_for_server()
@@ -55,17 +64,30 @@ class GoalSender(Node):
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
         self.latest_map = None
-        self.flag = False
+        self.strong_flag = False
+        self.weak_flag = False
         self.active_goal_handle = None
         self.r_trig = RTrig()
-        self.done = False
+        self.stopped = False
         self.error_x = 0.0
+
         self.target_state = "SEARCHING"
+        self.previous_target_state = "SEARCHING"
+
+        self.pan_joint_name = "pt_base_link_to_pt_link1"
+        self.pan_joint_angle = 0.0
+        self.candidate_reference_angle = 0.0
+        self.alignment_active = False
+        self.alignment_angle_tolerance = 0.08
+        self.align_kp = 0.15
+        self.max_align_angular_speed = 0.25
+        self.min_align_angular_speed = 0.08
+
         # ZABEZPIECZENIE
         self.goal_uuid = 0
         self.blacklist = []
 
-        # POWOŁANIE TIMERA
+        # TIMER
         self.state_update = self.create_timer(0.1, self.machine_states)
 
     # CALLBACKS
@@ -74,38 +96,103 @@ class GoalSender(Node):
         # pobieranie najnowszej iteracji mapy
         self.latest_map = msg
 
-    def flag_callback(self, msg):
+    def weak_flag_callback(self, msg):
+        self.weak_flag = msg.data
 
-        self.flag = msg.data
+    def strong_flag_callback(self, msg):
 
-        if self.r_trig.update(self.flag):
+        self.strong_flag = msg.data
+
+        if self.r_trig.update(self.strong_flag):
             if self.active_goal_handle:
                 self.active_goal_handle.cancel_goal_async()
             self.current_goal = None
-            self.done = False
+            self.stopped = False
             self.stop()
 
     def state_callback(self, msg):
+        self.previous_target_state = self.target_state
         self.target_state = msg.data
+
+        if self.target_state in [
+            "CANDIDATE",
+            "FOCUSED",
+        ] and self.previous_target_state not in ["CANDIDATE", "FOCUSED"]:
+            self.candidate_reference_angle = self.pan_joint_angle
+            self.alignment_active = True
+
+        if self.target_state not in ["CANDIDATE", "FOCUSED"]:
+            self.alignment_active = False
 
     def error_callback(self, msg):
 
         self.error_x = msg.x
         self.error_y = msg.y
 
+    def joint_states_callback(self, msg):
+        if self.pan_joint_name in msg.name:
+            idx = msg.name.index(self.pan_joint_name)
+            self.pan_joint_angle = msg.position[idx]
+
     # STATES
 
     def machine_states(self):
 
-        if self.target_state in ["CONFIRMED", "CANDIDATE"]:
+        if self.target_state in ["CANDIDATE", "FOCUSED"]:
+            if self.active_goal_handle:
+                self.active_goal_handle.cancel_goal_async()
+                self.active_goal_handle = None
+                self.current_goal = None
+                self.get_logger().info("Anuluję trasę z NAV2")
+            if self.alignment_active:
+                if self.weak_flag:
+                    self.align_to_candidate_target()
+                    self.get_logger().info("Obracam platformę w stronę celu")
+                else:
+                    self.stop()
+                    self.get_logger().info("YOLO nie widzi ostro piłki. Mrożę bazę w oczekiwaniu.")
+            else:
+                self.stop()
+                self.get_logger().info("Zatrzymuję się; baza wózka zrównana prostopadle do celu! 🎯")
+
+        elif self.target_state == "CONFIRMED":
             self.stop()
-            self.get_logger().info(
-                "Znaleziono flagę! Zatrzymuję się i czekam na dalsze instrukcje... 🏁"
-            )
-            # if self.done == True:
-            #   self.center_target(self.error_x)
+
         elif self.target_state == "SEARCHING":
             self.exploration_loop()
+
+    def align_to_candidate_target(self):
+        if not self.alignment_active:
+            return
+
+        angle_error = self.pan_joint_angle
+
+        if abs(angle_error) < self.alignment_angle_tolerance:
+            self.stop()
+            self.alignment_active = False
+            return
+
+        angular_cmd = self.align_kp * angle_error
+
+        if angular_cmd > self.max_align_angular_speed:
+            angular_cmd = self.max_align_angular_speed
+        elif angular_cmd < -self.max_align_angular_speed:
+            angular_cmd = -self.max_align_angular_speed
+
+        if 0.0 < angular_cmd < self.min_align_angular_speed:
+            angular_cmd = self.min_align_angular_speed
+        elif -self.min_align_angular_speed < angular_cmd < 0.0:
+            angular_cmd = -self.min_align_angular_speed
+
+        twist_msg = Twist()
+        twist_msg.linear.x = 0.0
+        twist_msg.linear.y = 0.0
+        twist_msg.linear.z = 0.0
+        twist_msg.angular.x = 0.0
+        twist_msg.angular.y = 0.0
+        twist_msg.angular.z = angular_cmd
+        self.cmd_vel_pub.publish(twist_msg)
+        self.stopped = False
 
     def center_target(self, x):
 
@@ -116,7 +203,8 @@ class GoalSender(Node):
 
     def stop(self):
 
-        if not self.done:
+        if not self.stopped:
+
             twist_msg = Twist()
             twist_msg.linear.x = 0.0
             twist_msg.linear.y = 0.0
@@ -125,10 +213,10 @@ class GoalSender(Node):
             twist_msg.angular.y = 0.0
             twist_msg.angular.z = 0.0
             self.cmd_vel_pub.publish(twist_msg)
-            self.done = True
+            self.stopped = True
 
     def exploration_loop(self):
-        self.done = False
+        self.stopped = False
 
         # awaryjne zrzucenie kalkulacji, o ile subskrybent nie dostarczył pierwszego obrazu z LiDARA
         if self.latest_map is None:
