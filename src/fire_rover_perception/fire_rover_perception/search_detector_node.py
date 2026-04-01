@@ -102,7 +102,7 @@ class SearchDetectorNode(Node):
             if cls == 32:
                 cx, cy, w, h = box.xywh[0]
                 self.get_logger().info("Znaleziono słaby cel.")
-                error_x = float(cx.item()) - 960.0
+                error_x = float(cx.item()) - 320.0
 
                 self.weak_flag = True
 
@@ -144,8 +144,7 @@ class SearchDetectorNode(Node):
                 if self.consecutive_hits >= self.search_confirm_threshold:
                     self.target_state = "CANDIDATE"
                     self.consecutive_misses = 0
-
-       elif self.target_state == "CANDIDATE":
+        elif self.target_state == "CANDIDATE":
             if self.strong_flag:
                 self.seen_strong = True
 

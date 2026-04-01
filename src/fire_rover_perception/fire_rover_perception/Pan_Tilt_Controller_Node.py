@@ -52,6 +52,7 @@ class PanTiltControllerNode(Node):
         self.pan_joint_name = "pt_base_link_to_pt_link1"
 
         self.last_error_x = 0.0
+        self.search_direction = 1
 
         # ZEGAR WYWOŁUJĄCY METODE
         self.state_update = self.create_timer(0.1, self.machine_states)
@@ -84,7 +85,7 @@ class PanTiltControllerNode(Node):
 
             self.pan_position = self.current_pan_joint_position
 
-            self.candidate_direction = -1 if self.last_error_x >= 0 else 1
+            self.candidate_direction = 1 if self.last_error_x >= 0 else -1
 
         if (
             self.target_state == "CONFIRMED"
@@ -110,11 +111,19 @@ class PanTiltControllerNode(Node):
 
     def searching_behavior(self):
         self.get_logger().info("State: SEARCHING")
-        self.pan_position += self.pan_step
 
-        if self.pan_position > math.pi:
-            self.pan_position = -math.pi
+        if not self.weak_flag:
+            self.pan_position += self.pan_step * self.search_direction
+            if self.pan_position > math.pi:
+                self.pan_position = math.pi
+                self.search_direction = -1
+            elif self.pan_position < -math.pi:
+                self.pan_position = -math.pi
+                self.search_direction = 1
+        else:
+            self.get_logger().info("Ruch podejrzany w SEARCHING! Lufa zamrożona - oczekiwanie na wyrok 5 klatek z YOLO...")
 
+        self.get_logger().info(f"Pan position: {self.pan_position}, pan step: {self.pan_step}")
         self.send_data(self.pan_position)
 
     def confirmed_behavior(self):
@@ -125,38 +134,35 @@ class PanTiltControllerNode(Node):
         self.get_logger().info("State: CANDIDATE")
 
         if self.weak_flag:
-
             self.lost_frames_count = 0
-            pan_kp=0.0003
 
+            # P-regulator: zeruj korekcję w dead-zone, proporcjonalnie poza nią
+            pan_kp = 0.0008
             if abs(self.last_error_x) < 50.0:
                 pan_correction = 0.0
             else:
-                pan_correction = -self.last_error_x * pan_kp
-
-            max_step = 0.02
-            if pan_correction > max_step:
-                pan_correction = max_step
-            elif pan_correction < -max_step:
-                pan_correction = -max_step
+                pan_correction = max(-0.02, min(0.02, self.last_error_x * pan_kp))
 
             self.pan_position += pan_correction
             self.candidate_center_pan = self.pan_position
-
-            self.get_logger().info(f"Pan correction: {pan_correction}")
+            self.get_logger().info(f"Pan correction: {pan_correction:.4f}")
 
         else:
-            # min_pan = max(-math.pi, self.candidate_center_pan - self.candidate_half_range)
-            # max_pan = min(math.pi, self.candidate_center_pan + self.candidate_half_range)
-            # self.pan_position += self.pan_step * 0.25 * self.candidate_direction
-            # if self.pan_position > max_pan:
-            #     self.pan_position = max_pan
-            #     self.candidate_direction = -1
-            # elif self.pan_position < min_pan:
-            #     self.pan_position = min_pan
-            #     self.candidate_direction = 1
-            pass
+            self.lost_frames_count += 1
 
+            # Daj YOLO chwilę — może cel mignie na 1-2 klatki
+            if self.lost_frames_count > self.max_lost_frames:
+                # Lokalny sweep wokół ostatniej znanej pozycji celu
+                min_pan = max(-math.pi, self.candidate_center_pan - self.candidate_half_range)
+                max_pan = min(math.pi, self.candidate_center_pan + self.candidate_half_range)
+                self.pan_position += self.pan_step * 0.25 * self.candidate_direction
+                if self.pan_position > max_pan:
+                    self.pan_position = max_pan
+                    self.candidate_direction = -1
+                elif self.pan_position < min_pan:
+                    self.pan_position = min_pan
+                    self.candidate_direction = 1
+                self.get_logger().info(f"Sweep lokalny: pos={self.pan_position:.3f}, dir={self.candidate_direction}")
 
         self.send_data(self.pan_position)
 

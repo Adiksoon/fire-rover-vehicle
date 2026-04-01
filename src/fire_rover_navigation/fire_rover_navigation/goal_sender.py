@@ -83,9 +83,14 @@ class GoalSender(Node):
         self.max_align_angular_speed = 0.25
         self.min_align_angular_speed = 0.08
 
+
+        self.last_flag_time = None
+        self.suspect_yaw = None
+
         # ZABEZPIECZENIE
         self.goal_uuid = 0
-        self.blacklist = []
+        self.blacklist = []  # lista krotek (x, y, timestamp)
+        self.blacklist_ttl = 120.0  # sekundy życia wpisu na czarnej liście
 
         # TIMER
         self.state_update = self.create_timer(0.1, self.machine_states)
@@ -134,16 +139,14 @@ class GoalSender(Node):
             idx = msg.name.index(self.pan_joint_name)
             self.pan_joint_angle = msg.position[idx]
 
-    # STATES
 
+    # MACHINE STATES
     def machine_states(self):
 
         if self.target_state in ["CANDIDATE", "FOCUSED"]:
-            if self.active_goal_handle:
-                self.active_goal_handle.cancel_goal_async()
-                self.active_goal_handle = None
-                self.current_goal = None
-                self.get_logger().info("Anuluję trasę z NAV2")
+
+            self.cancel_nav2_goal()
+
             if self.alignment_active:
                 if self.weak_flag:
                     self.align_to_candidate_target()
@@ -159,7 +162,30 @@ class GoalSender(Node):
             self.stop()
 
         elif self.target_state == "SEARCHING":
-            self.exploration_loop()
+            if self.weak_flag or self.strong_flag:
+                self.cancel_nav2_goal()
+                self.stop()
+
+                self.last_flag_time = self.get_clock().now()
+
+                try:
+                    transform = self.tf_buffer.lookup_transform("map", "base_footprint", Time())
+                    q = transform.transform.rotation
+                    r_rot = R.from_quat([q.x, q.y, q.z, q.w])
+                    _, _, robot_yaw = r_rot.as_euler('xyz')
+
+                    self.suspect_yaw = robot_yaw - self.pan_joint_angle
+                except Exception as e:
+                    self.get_logger().warn(f"TF wybuchło podczas szukania azymutu: {e}")
+                    self.suspect_yaw = None
+
+                self.get_logger().info("Zarys w SEARCHING! Wstrzymuję napęd, podglądam TF kompasu...")
+            else:
+                self.exploration_loop()
+
+
+
+    # STATES
 
     def align_to_candidate_target(self):
         if not self.alignment_active:
@@ -215,6 +241,13 @@ class GoalSender(Node):
             self.cmd_vel_pub.publish(twist_msg)
             self.stopped = True
 
+    def cancel_nav2_goal(self):
+        if self.active_goal_handle:
+                self.active_goal_handle.cancel_goal_async()
+                self.active_goal_handle = None
+                self.current_goal = None
+                self.get_logger().info("Anuluję trasę z NAV2")
+
     def exploration_loop(self):
         self.stopped = False
 
@@ -248,6 +281,12 @@ class GoalSender(Node):
             )
             if dist_to_goal > 1.0:
                 return
+
+        # KROK 3: Wyliczenie wieku ostatniego "ducha" z YOLO
+        time_since_last_flag = float('inf')
+        if self.last_flag_time is not None:
+             time_nanos = (self.get_clock().now().nanoseconds - self.last_flag_time.nanoseconds)
+             time_since_last_flag = time_nanos / 1e9
 
         # re-strukturyzacja 1D mapy ROS Ocupancy do klasycznej formy macierzy matematycznej NumPy
         grid = np.array(data, dtype=np.int8).reshape((height, width))
@@ -300,19 +339,25 @@ class GoalSender(Node):
         best_world_x = None
         best_world_y = None
 
+        centroid_scores = []
+
         for idx, (cy, cx) in enumerate(centroids):
             # konwersja cyfr Indexowych macierzy prosto pod miary systemu Światowego TF (metryczne)
             world_x = origin_x + cx * resolution
             world_y = origin_y + cy * resolution
 
             # BLACKLISTA: Jeśli cel znajduje się w skażonej strefie (blisko odrzuconych celów) pomijamy matematykę
+            now = self.get_clock().now().nanoseconds / 1e9
             is_toxic = False
-            for bx, by in self.blacklist:
+            for bx, by, bt in self.blacklist:
+                if (now - bt) > self.blacklist_ttl:
+                    continue  # wpis wygasł
                 if math.hypot(world_x - bx, world_y - by) < 0.5:
                     is_toxic = True
                     break
 
             if is_toxic:
+                centroid_scores.append(0.0)
                 continue
 
             # odległość matematyczna Centroida bezpośrednio pod kołami
@@ -320,12 +365,27 @@ class GoalSender(Node):
 
             # zakrawędziowanie "żeby nie wariował pod kołami" - rzucanie prosto w próżnię dalej niż my sami
             if dist_to_robot < 1.0:
+                centroid_scores.append(0.0)
                 continue
 
             # SYSTEM OCENY CELA: Klaster duży dostaje punkty, dystans podniesiony do kwadratu miażdży wyniki, by faworyzować najbliższe terytorium do roboty
             c_id = valid_cluster_ids[idx]
             size = cluster_sizes[c_id - 1]
             score = size / (dist_to_robot**2)
+
+            # --- KROK 3: DIRECTIONAL BOOSTER ---
+            # Jeśli widzieliśmy ducha wciągu ostatnich 15 sekund i mamy zapisany jego azymut na mapie
+            if time_since_last_flag < 15.0 and self.suspect_yaw is not None:
+                yaw_to_centroid = math.atan2(world_y - robot_y, world_x - robot_x)
+
+                # Oblicz najkrótszą matematyczną odległość kątową po kole (uniknięcie błędu przeskoczenia z -Pi na Pi)
+                angle_diff = abs((yaw_to_centroid - self.suspect_yaw + math.pi) % (2.0 * math.pi) - math.pi)
+
+                # Jeżeli cel leży w szerokim stożku poszukiwań (+/- 45 stopni czyli ~0.785 rad) z nosa lufy:
+                if angle_diff < 0.8:
+                    score *= 8.0  # Ośmiokrotny potężny Boost nagrody! (Złota Gałąź Drzewa)
+
+            centroid_scores.append(score)
 
             if score > best_score:
                 best_score = score
@@ -348,7 +408,7 @@ class GoalSender(Node):
 
         # publikacja zsynchronizowanego układu markerów dla okienka RViz
         self.publish_markers(
-            centroids, origin_x, origin_y, resolution, world_x, world_y
+            centroids, centroid_scores, origin_x, origin_y, resolution, world_x, world_y
         )
 
         # kompilacja zlecenia nawigacji preempcyjnej do sterownika Nav2_Client
@@ -370,24 +430,24 @@ class GoalSender(Node):
         self.current_goal = (world_x, world_y)
         self.goal_uuid += 1
         current_id = self.goal_uuid
+        goal_coords = (world_x, world_y)  # zamknięcie koordynatów w closure
 
         self.result_future = self._action_client.send_goal_async(
             goal_msg, feedback_callback=self.feedback_callback
         )
         self.result_future.add_done_callback(
-            lambda future: self.goal_response_callback(future, current_id)
+            lambda future: self.goal_response_callback(future, current_id, goal_coords)
         )
 
-    def goal_response_callback(self, future, current_id):
+    def goal_response_callback(self, future, current_id, goal_coords):
         # odpowiedź z sieci serwera - odbiór kurierski od Nav2
         goal_handle = future.result()
         if not goal_handle.accepted:
             self.get_logger().info("Goal odrzucony u Kuriera w połowie lotu ❌")
             self.active_goal_handle = None
 
-            # Wpisujemy cel natychmiast na Czarną Listę by zapomnieć go na zawsze
-            if self.current_goal is not None:
-                self.blacklist.append(self.current_goal)
+            # Wpisujemy cel natychmiast na Czarną Listę (koordynaty z closure, nie z self!)
+            self.blacklist.append((*goal_coords, self.get_clock().now().nanoseconds / 1e9))
 
             # Upewniamy się, czy w międzyczasie Timer Pythona nie przysłał tu sam nowej ścieżki!
             if self.goal_uuid == current_id:
@@ -401,24 +461,26 @@ class GoalSender(Node):
 
         # po zaakceptowaniu, wieszamy asynchroniczną pętlę wyrokową...
         self.result_future.add_done_callback(
-            lambda future: self.get_result_callback(future, current_id)
+            lambda future: self.get_result_callback(future, current_id, goal_coords)
         )
 
-    def get_result_callback(self, future, current_id):
+    def get_result_callback(self, future, current_id, goal_coords):
         status = future.result().status
 
         # jeżeli wjechałeś poprawnie z statusem SUCCEEDED - cel osiągnięty!
         if status == GoalStatus.STATUS_SUCCEEDED:
             self.get_logger().info("Hura! Dotarłem do celu! Frontiery odkryto. 🎯")
+        elif status == GoalStatus.STATUS_CANCELED:
+            # Anulowanie to decyzja świadoma (np. YOLO wykrył cel) — nie karz za to frontiera
+            self.get_logger().info("Trasa anulowana świadomie (cel wykryty?) — nie blacklistuję.")
         else:
-            # jeżeli zdarzył się dramat w trakcie jazdy (wspomniany słynny Status 6) wózek wyrzuci błąd Nav2. Oznaczamy skazany teren do Zeszytu Czarnej Lity. ☠️
+            # jeżeli zdarzył się dramat w trakcie jazdy (wspomniany słynny Status 6) wózek wyrzuci błąd Nav2
             self.get_logger().warn(
-                f"!!! TRASA ZERWANA W TRAKCIE !!! Nav2 wypluł się błędem (np. 6 = ABORTED): {status}"
+                f"!!! TRASA ZERWANA W TRAKCIE !!! Nav2 status: {status}"
             )
-            if self.current_goal is not None:
-                self.blacklist.append(self.current_goal)
+            self.blacklist.append((*goal_coords, self.get_clock().now().nanoseconds / 1e9))
 
-        # OCHRONA PRZED PREEMPCJĄ: Nawet jeśli wózek się rozbił ze statusem 6, wyczyścimy "obecny cel", Z WYJĄTKIEM sytuacji gdy zdążyliśmy wbić się w timer z Nowym Celem z ID!
+        # OCHRONA PRZED PREEMPCJĄ
         if current_id == self.goal_uuid:
             self.current_goal = None
             self.active_goal_handle = None
@@ -427,17 +489,34 @@ class GoalSender(Node):
         pass
 
     def publish_markers(
-        self, centroids, origin_x, origin_y, resolution, best_x, best_y
+        self, centroids, centroid_scores, origin_x, origin_y, resolution, best_x, best_y
     ):
         marker_array = MarkerArray()
 
         # 1. DELETE - Czyszczenie z monitorów starych, bezużytecznych już punktów (wycieraczka)
         delete_marker = Marker()
         delete_marker.action = Marker.DELETEALL
-        marker_array.markers.append(delete_marker)  # type:ignore
+        marker_array.markers.append(delete_marker)
+
+        # Matematyka normalizująca dla wizualizacji (chroni przed absurdalnymi rozmiarami po zboostowaniu)
+        max_s = 1.0
+        min_s = 0.0
+        if centroid_scores:
+            max_val = max(centroid_scores)
+            min_val = min(centroid_scores)
+            if max_val > min_val:
+                max_s = max_val
+                min_s = min_val
 
         # 2. Rysowanie masowo wszystkich rozpatrywanych matematycznie przez kod centroidów klastra
         for i, (cy, cx) in enumerate(centroids):
+            score = centroid_scores[i] if i < len(centroid_scores) else 0.0
+
+            # Wciśnij wszystkie punkty nagród do skalera [od 0.1 metra do chamskiego 0.6 metra] w okienku!
+            norm_size = 0.1
+            if max_s > min_s:
+                norm_size = 0.1 + 0.5 * ((score - min_s) / (max_s - min_s))
+
             marker = Marker()
             marker.header.frame_id = "map"
             marker.header.stamp = self.get_clock().now().to_msg()
@@ -446,9 +525,9 @@ class GoalSender(Node):
             marker.type = Marker.SPHERE
             marker.action = Marker.ADD
 
-            marker.scale.x = 0.2
-            marker.scale.y = 0.2
-            marker.scale.z = 0.2
+            marker.scale.x = norm_size
+            marker.scale.y = norm_size
+            marker.scale.z = norm_size
 
             marker.color.r = 1.0
             marker.color.g = 0.0

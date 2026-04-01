@@ -132,6 +132,7 @@ def generate_launch_description():
         actions=[ekf_node, slam_node, pan_controller],
     )
 
+
     return LaunchDescription(
         [
             set_sim_time,
