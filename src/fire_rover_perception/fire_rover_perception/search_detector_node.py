@@ -52,11 +52,11 @@ class SearchDetectorNode(Node):
         self.strong_conf_threshold = 0.8
         self.weak_conf_threshold = 0.6
 
-        self.search_confirm_threshold = 5     # Awans na kandydata (Odsiew Duchów)
-        self.focus_confirm_threshold = 10     # Awans na Focusa
+        self.search_confirm_threshold = 5  # Awans na kandydata (Odsiew Duchów)
+        self.focus_confirm_threshold = 10  # Awans na Focusa
         self.candidate_missed_threshold = 75  # Spadek do szukania
-        self.focused_missed_threshold = 30    # Utrata Focusa
-        self.confirmed_missed_threshold = 150 # Utrata Confirmed
+        self.focused_missed_threshold = 30  # Utrata Focusa
+        self.confirmed_missed_threshold = 150  # Utrata Confirmed
 
         self.model = YOLO("yolo26m.pt")
 
@@ -148,7 +148,10 @@ class SearchDetectorNode(Node):
             if self.strong_flag:
                 self.seen_strong = True
 
-            if self.consecutive_hits >= self.focus_confirm_threshold and self.seen_strong:
+            if (
+                self.consecutive_hits >= self.focus_confirm_threshold
+                and self.seen_strong
+            ):
                 self.target_state = "FOCUSED"
                 self.consecutive_misses = 0
                 self.seen_strong = False

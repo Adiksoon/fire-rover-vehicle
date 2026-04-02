@@ -78,11 +78,10 @@ class GoalSender(Node):
         self.pan_joint_angle = 0.0
         self.candidate_reference_angle = 0.0
         self.alignment_active = False
-        self.alignment_angle_tolerance = 0.08
+        self.alignment_angle_tolerance = 0.01
         self.align_kp = 0.15
         self.max_align_angular_speed = 0.25
         self.min_align_angular_speed = 0.08
-
 
         self.last_flag_time = None
         self.suspect_yaw = None
@@ -113,21 +112,23 @@ class GoalSender(Node):
                 self.active_goal_handle.cancel_goal_async()
             self.current_goal = None
             self.stopped = False
-            self.stop()
 
     def state_callback(self, msg):
         self.previous_target_state = self.target_state
         self.target_state = msg.data
+        self.alignment_active = (
+            True if self.target_state in ["CANDIDATE", "FOCUSED"] else False
+        )
 
-        if self.target_state in [
-            "CANDIDATE",
-            "FOCUSED",
-        ] and self.previous_target_state not in ["CANDIDATE", "FOCUSED"]:
-            self.candidate_reference_angle = self.pan_joint_angle
-            self.alignment_active = True
+        # if self.target_state in [
+        #     "CANDIDATE",
+        #     "FOCUSED",]:
+        # # ] and self.previous_target_state not in ["CANDIDATE", "FOCUSED"]:
+        #     self.candidate_reference_angle = self.pan_joint_angle
+        #     self.alignment_active = True
 
-        if self.target_state not in ["CANDIDATE", "FOCUSED"]:
-            self.alignment_active = False
+        # if self.target_state not in ["CANDIDATE", "FOCUSED"]:
+        #     self.alignment_active = False
 
     def error_callback(self, msg):
 
@@ -139,24 +140,29 @@ class GoalSender(Node):
             idx = msg.name.index(self.pan_joint_name)
             self.pan_joint_angle = msg.position[idx]
 
-
     # MACHINE STATES
     def machine_states(self):
+        self.get_logger().debug(f"Stan: {self.alignment_active}")
 
         if self.target_state in ["CANDIDATE", "FOCUSED"]:
 
             self.cancel_nav2_goal()
 
             if self.alignment_active:
-                if self.weak_flag:
-                    self.align_to_candidate_target()
-                    self.get_logger().info("Obracam platformę w stronę celu")
-                else:
-                    self.stop()
-                    self.get_logger().info("YOLO nie widzi ostro piłki. Mrożę bazę w oczekiwaniu.")
+                # if self.weak_flag or self.strong_flag:
+                self.align_to_candidate_target()
+                self.get_logger().info("Obracam platformę w stronę celu")
+                # else:
+                #     self.stop()
+                #     self.get_logger().info(
+                #         "YOLO nie widzi ostro piłki. Mrożę bazę w oczekiwaniu."
+                #     )
+                #     pass
             else:
                 self.stop()
-                self.get_logger().info("Zatrzymuję się; baza wózka zrównana prostopadle do celu! 🎯")
+                self.get_logger().info(
+                    "Zatrzymuję się; baza wózka zrównana prostopadle do celu! 🎯"
+                )
 
         elif self.target_state == "CONFIRMED":
             self.stop()
@@ -164,51 +170,54 @@ class GoalSender(Node):
         elif self.target_state == "SEARCHING":
             if self.weak_flag or self.strong_flag:
                 self.cancel_nav2_goal()
-                self.stop()
 
                 self.last_flag_time = self.get_clock().now()
 
                 try:
-                    transform = self.tf_buffer.lookup_transform("map", "base_footprint", Time())
+                    transform = self.tf_buffer.lookup_transform(
+                        "map", "base_footprint", Time()
+                    )
                     q = transform.transform.rotation
                     r_rot = R.from_quat([q.x, q.y, q.z, q.w])
-                    _, _, robot_yaw = r_rot.as_euler('xyz')
+                    _, _, robot_yaw = r_rot.as_euler("xyz")
 
                     self.suspect_yaw = robot_yaw - self.pan_joint_angle
                 except Exception as e:
                     self.get_logger().warn(f"TF wybuchło podczas szukania azymutu: {e}")
                     self.suspect_yaw = None
 
-                self.get_logger().info("Zarys w SEARCHING! Wstrzymuję napęd, podglądam TF kompasu...")
+                self.get_logger().info(
+                    "Zarys w SEARCHING! Wstrzymuję napęd, podglądam TF kompasu..."
+                )
             else:
                 self.exploration_loop()
-
-
 
     # STATES
 
     def align_to_candidate_target(self):
         if not self.alignment_active:
             return
+        self.get_logger().info("Rozpoczynam wyrównywanie do celu...")
 
         angle_error = self.pan_joint_angle
 
         if abs(angle_error) < self.alignment_angle_tolerance:
             self.stop()
             self.alignment_active = False
+            self.get_logger().info("jestem w tolerancji")
             return
 
         angular_cmd = self.align_kp * angle_error
 
-        if angular_cmd > self.max_align_angular_speed:
-            angular_cmd = self.max_align_angular_speed
-        elif angular_cmd < -self.max_align_angular_speed:
-            angular_cmd = -self.max_align_angular_speed
+        # if angular_cmd > self.max_align_angular_speed:
+        #     angular_cmd = self.max_align_angular_speed
+        # elif angular_cmd < -self.max_align_angular_speed:
+        #     angular_cmd = -self.max_align_angular_speed
 
-        if 0.0 < angular_cmd < self.min_align_angular_speed:
-            angular_cmd = self.min_align_angular_speed
-        elif -self.min_align_angular_speed < angular_cmd < 0.0:
-            angular_cmd = -self.min_align_angular_speed
+        # if 0.0 < angular_cmd < self.min_align_angular_speed:
+        #     angular_cmd = self.min_align_angular_speed
+        # elif -self.min_align_angular_speed < angular_cmd < 0.0:
+        #     angular_cmd = -self.min_align_angular_speed
 
         twist_msg = Twist()
         twist_msg.linear.x = 0.0
@@ -217,6 +226,7 @@ class GoalSender(Node):
         twist_msg.angular.x = 0.0
         twist_msg.angular.y = 0.0
         twist_msg.angular.z = angular_cmd
+        self.get_logger().info(f"Publikuje cmd: {angular_cmd:.3f}")
         self.cmd_vel_pub.publish(twist_msg)
         self.stopped = False
 
@@ -243,10 +253,10 @@ class GoalSender(Node):
 
     def cancel_nav2_goal(self):
         if self.active_goal_handle:
-                self.active_goal_handle.cancel_goal_async()
-                self.active_goal_handle = None
-                self.current_goal = None
-                self.get_logger().info("Anuluję trasę z NAV2")
+            self.active_goal_handle.cancel_goal_async()
+            self.active_goal_handle = None
+            self.current_goal = None
+            self.get_logger().info("Anuluję trasę z NAV2")
 
     def exploration_loop(self):
         self.stopped = False
@@ -283,10 +293,12 @@ class GoalSender(Node):
                 return
 
         # KROK 3: Wyliczenie wieku ostatniego "ducha" z YOLO
-        time_since_last_flag = float('inf')
+        time_since_last_flag = float("inf")
         if self.last_flag_time is not None:
-             time_nanos = (self.get_clock().now().nanoseconds - self.last_flag_time.nanoseconds)
-             time_since_last_flag = time_nanos / 1e9
+            time_nanos = (
+                self.get_clock().now().nanoseconds - self.last_flag_time.nanoseconds
+            )
+            time_since_last_flag = time_nanos / 1e9
 
         # re-strukturyzacja 1D mapy ROS Ocupancy do klasycznej formy macierzy matematycznej NumPy
         grid = np.array(data, dtype=np.int8).reshape((height, width))
@@ -298,7 +310,7 @@ class GoalSender(Node):
 
         # DYLATACJA: Ochronne "nadmuchiwanie" nieznanych rogów i strefy zderzeniowej ścian (promień wyznaczony w symulatorze poprzez iterations)
         unknown_expanded = ndimage.binary_dilation(unknown_space)
-        obstacles_expanded = ndimage.binary_dilation(obstacles, iterations=8)
+        obstacles_expanded = ndimage.binary_dilation(obstacles, iterations=12)
 
         # wycięcie ostatecznych Krawędzi Półmroku (frontiers) matematycznie wykluczając strefy zablokowane
         frontiers_mask = free_space & unknown_expanded & ~obstacles_expanded  # type: ignore
@@ -379,11 +391,16 @@ class GoalSender(Node):
                 yaw_to_centroid = math.atan2(world_y - robot_y, world_x - robot_x)
 
                 # Oblicz najkrótszą matematyczną odległość kątową po kole (uniknięcie błędu przeskoczenia z -Pi na Pi)
-                angle_diff = abs((yaw_to_centroid - self.suspect_yaw + math.pi) % (2.0 * math.pi) - math.pi)
+                angle_diff = abs(
+                    (yaw_to_centroid - self.suspect_yaw + math.pi) % (2.0 * math.pi)
+                    - math.pi
+                )
 
                 # Jeżeli cel leży w szerokim stożku poszukiwań (+/- 45 stopni czyli ~0.785 rad) z nosa lufy:
                 if angle_diff < 0.8:
-                    score *= 8.0  # Ośmiokrotny potężny Boost nagrody! (Złota Gałąź Drzewa)
+                    score *= (
+                        8.0  # Ośmiokrotny potężny Boost nagrody! (Złota Gałąź Drzewa)
+                    )
 
             centroid_scores.append(score)
 
@@ -447,7 +464,9 @@ class GoalSender(Node):
             self.active_goal_handle = None
 
             # Wpisujemy cel natychmiast na Czarną Listę (koordynaty z closure, nie z self!)
-            self.blacklist.append((*goal_coords, self.get_clock().now().nanoseconds / 1e9))
+            self.blacklist.append(
+                (*goal_coords, self.get_clock().now().nanoseconds / 1e9)
+            )
 
             # Upewniamy się, czy w międzyczasie Timer Pythona nie przysłał tu sam nowej ścieżki!
             if self.goal_uuid == current_id:
@@ -472,13 +491,17 @@ class GoalSender(Node):
             self.get_logger().info("Hura! Dotarłem do celu! Frontiery odkryto. 🎯")
         elif status == GoalStatus.STATUS_CANCELED:
             # Anulowanie to decyzja świadoma (np. YOLO wykrył cel) — nie karz za to frontiera
-            self.get_logger().info("Trasa anulowana świadomie (cel wykryty?) — nie blacklistuję.")
+            self.get_logger().info(
+                "Trasa anulowana świadomie (cel wykryty?) — nie blacklistuję."
+            )
         else:
             # jeżeli zdarzył się dramat w trakcie jazdy (wspomniany słynny Status 6) wózek wyrzuci błąd Nav2
             self.get_logger().warn(
                 f"!!! TRASA ZERWANA W TRAKCIE !!! Nav2 status: {status}"
             )
-            self.blacklist.append((*goal_coords, self.get_clock().now().nanoseconds / 1e9))
+            self.blacklist.append(
+                (*goal_coords, self.get_clock().now().nanoseconds / 1e9)
+            )
 
         # OCHRONA PRZED PREEMPCJĄ
         if current_id == self.goal_uuid:

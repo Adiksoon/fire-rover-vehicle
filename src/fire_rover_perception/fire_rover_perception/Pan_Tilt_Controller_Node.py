@@ -25,7 +25,9 @@ class PanTiltControllerNode(Node):
             JointState, "/joint_states", self.joint_states_callback, 10
         )
 
-        self.error_sub = self.create_subscription(Point, "/error_xy", self.error_callback, 10)
+        self.error_sub = self.create_subscription(
+            Point, "/error_xy", self.error_callback, 10
+        )
 
         # PUBLIKACJE
         self.pan_pub = self.create_publisher(Float64, "/pan_tilt/pan_cmd", 10)
@@ -103,10 +105,10 @@ class PanTiltControllerNode(Node):
         elif self.target_state == "CANDIDATE":
             self.candidate_behavior()
         elif self.target_state == "FOCUSED":
-            #self.focused_behavior()
+            # self.focused_behavior()
             self.candidate_behavior()
         elif self.target_state == "CONFIRMED":
-            #self.confirmed_behavior()
+            # self.confirmed_behavior()
             self.candidate_behavior()
 
     def searching_behavior(self):
@@ -121,9 +123,13 @@ class PanTiltControllerNode(Node):
                 self.pan_position = -math.pi
                 self.search_direction = 1
         else:
-            self.get_logger().info("Ruch podejrzany w SEARCHING! Lufa zamrożona - oczekiwanie na wyrok 5 klatek z YOLO...")
+            self.get_logger().info(
+                "Ruch podejrzany w SEARCHING! Lufa zamrożona - oczekiwanie na wyrok 5 klatek z YOLO..."
+            )
 
-        self.get_logger().info(f"Pan position: {self.pan_position}, pan step: {self.pan_step}")
+        self.get_logger().info(
+            f"Pan position: {self.pan_position}, pan step: {self.pan_step}"
+        )
         self.send_data(self.pan_position)
 
     def confirmed_behavior(self):
@@ -153,8 +159,12 @@ class PanTiltControllerNode(Node):
             # Daj YOLO chwilę — może cel mignie na 1-2 klatki
             if self.lost_frames_count > self.max_lost_frames:
                 # Lokalny sweep wokół ostatniej znanej pozycji celu
-                min_pan = max(-math.pi, self.candidate_center_pan - self.candidate_half_range)
-                max_pan = min(math.pi, self.candidate_center_pan + self.candidate_half_range)
+                min_pan = max(
+                    -math.pi, self.candidate_center_pan - self.candidate_half_range
+                )
+                max_pan = min(
+                    math.pi, self.candidate_center_pan + self.candidate_half_range
+                )
                 self.pan_position += self.pan_step * 0.25 * self.candidate_direction
                 if self.pan_position > max_pan:
                     self.pan_position = max_pan
@@ -162,7 +172,9 @@ class PanTiltControllerNode(Node):
                 elif self.pan_position < min_pan:
                     self.pan_position = min_pan
                     self.candidate_direction = 1
-                self.get_logger().info(f"Sweep lokalny: pos={self.pan_position:.3f}, dir={self.candidate_direction}")
+                self.get_logger().info(
+                    f"Sweep lokalny: pos={self.pan_position:.3f}, dir={self.candidate_direction}"
+                )
 
         self.send_data(self.pan_position)
 
@@ -188,8 +200,12 @@ class PanTiltControllerNode(Node):
             self.lost_frames_count += 1
 
             if self.lost_frames_count > self.max_lost_frames:
-                min_pan = max(-math.pi, self.candidate_center_pan - self.focused_half_range)
-                max_pan = min(math.pi, self.candidate_center_pan + self.focused_half_range)
+                min_pan = max(
+                    -math.pi, self.candidate_center_pan - self.focused_half_range
+                )
+                max_pan = min(
+                    math.pi, self.candidate_center_pan + self.focused_half_range
+                )
                 self.pan_position += self.pan_step * 0.15 * self.candidate_direction
                 if self.pan_position > max_pan:
                     self.pan_position = max_pan
