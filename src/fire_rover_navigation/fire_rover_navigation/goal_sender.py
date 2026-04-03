@@ -6,7 +6,7 @@ from rclpy.action import ActionClient
 import numpy as np
 import scipy.ndimage as ndimage
 from scipy.spatial.transform import Rotation as R
-from nav2_msgs.action import NavigateToPose
+from nav2_msgs.action import NavigateToPose, Spin
 from nav_msgs.msg import OccupancyGrid
 from tf2_ros import Buffer, TransformListener
 from rclpy.time import Time
@@ -24,6 +24,7 @@ class GoalSender(Node):
 
         # TWORZENIE KLIENTA ACTION
         self._action_client = ActionClient(self, NavigateToPose, "/navigate_to_pose")
+        self._action_client_spin = ActionClient(self, Spin, "/spin")
 
         # SUBSKRYBENCI
         self.map_sub = self.create_subscription(
@@ -78,13 +79,30 @@ class GoalSender(Node):
         self.pan_joint_angle = 0.0
         self.candidate_reference_angle = 0.0
         self.alignment_active = False
-        self.alignment_angle_tolerance = 0.01
-        self.align_kp = 0.15
-        self.max_align_angular_speed = 0.25
-        self.min_align_angular_speed = 0.08
+
+        # Parametry dociągania bazy (Dead-zone i delay)
+        self.alignment_delay = 1.0  # sekunda opóźnienia
+        self.candidate_start_time = None
+        self.dead_zone_start = 0.26  # ~15 stopni (start ruchu bazy)
+        self.pan_joint_angle = 0.0
+        self.candidate_reference_angle = 0.0
+        self.alignment_active = False
+
+        # Parametry dociągania bazy (Safe Spin)
+        self.is_spinning = False
+        self.spin_trigger_threshold = 0.43  # ~25 stopni
+        self.active_spin_handle = None
+        self.candidate_start_time = None
+        self.alignment_delay = 1.0  # 1 sekunda na potwierdzenie celu przed obrotem
 
         self.last_flag_time = None
         self.suspect_yaw = None
+
+        self.alignment_delay = 1.5
+        self.candidate_start_time = None
+        self.is_spinning = False
+        self.dead_zone_start = 0.26
+        self.dead_zone_stop = 0.12
 
         # ZABEZPIECZENIE
         self.goal_uuid = 0
@@ -116,19 +134,31 @@ class GoalSender(Node):
     def state_callback(self, msg):
         self.previous_target_state = self.target_state
         self.target_state = msg.data
+
+        # Logika czasu wykrycia i resetu akcji
+        if self.target_state in [
+            "CANDIDATE",
+            "FOCUSED",
+        ] and self.previous_target_state not in ["CANDIDATE", "FOCUSED"]:
+            self.candidate_start_time = self.get_clock().now()
+
+        if self.target_state not in ["CANDIDATE", "FOCUSED"]:
+            self.candidate_start_time = None
+            self.cancel_spin_goal()
+
         self.alignment_active = (
             True if self.target_state in ["CANDIDATE", "FOCUSED"] else False
         )
 
-        # if self.target_state in [
-        #     "CANDIDATE",
-        #     "FOCUSED",]:
-        # # ] and self.previous_target_state not in ["CANDIDATE", "FOCUSED"]:
-        #     self.candidate_reference_angle = self.pan_joint_angle
-        #     self.alignment_active = True
+        if self.target_state in [
+            "CANDIDATE",
+            "FOCUSED",
+        ] and self.previous_target_state not in ["CANDIDATE", "FOCUSED"]:
+            self.candidate_start_time = self.get_clock().now()
 
-        # if self.target_state not in ["CANDIDATE", "FOCUSED"]:
-        #     self.alignment_active = False
+            if self.target_state not in ["CANDIDATE", "FOCUSED"]:
+                self.candidate_start_time = None
+                self.is_spinning = False
 
     def error_callback(self, msg):
 
@@ -149,15 +179,8 @@ class GoalSender(Node):
             self.cancel_nav2_goal()
 
             if self.alignment_active:
-                # if self.weak_flag or self.strong_flag:
                 self.align_to_candidate_target()
                 self.get_logger().info("Obracam platformę w stronę celu")
-                # else:
-                #     self.stop()
-                #     self.get_logger().info(
-                #         "YOLO nie widzi ostro piłki. Mrożę bazę w oczekiwaniu."
-                #     )
-                #     pass
             else:
                 self.stop()
                 self.get_logger().info(
@@ -168,6 +191,7 @@ class GoalSender(Node):
             self.stop()
 
         elif self.target_state == "SEARCHING":
+            self.cancel_spin_goal()
             if self.weak_flag or self.strong_flag:
                 self.cancel_nav2_goal()
 
@@ -195,40 +219,59 @@ class GoalSender(Node):
     # STATES
 
     def align_to_candidate_target(self):
-        if not self.alignment_active:
+        if not self.alignment_active or self.candidate_start_time is None:
             return
-        self.get_logger().info("Rozpoczynam wyrównywanie do celu...")
+
+        # Jeśli już się kręcimy, czekamy na wynik
+        if self.is_spinning:
+            return
+
+        # Sprawdź opóźnienie przed pierwszym ruchem
+        elapsed = (self.get_clock().now() - self.candidate_start_time).nanoseconds / 1e9
+        if elapsed < self.alignment_delay:
+            return
 
         angle_error = self.pan_joint_angle
 
-        if abs(angle_error) < self.alignment_angle_tolerance:
-            self.stop()
-            self.alignment_active = False
-            self.get_logger().info("jestem w tolerancji")
+        # Obrót tylko jeśli głowica jest mocno wychylona od osi wózka
+        if abs(angle_error) > self.spin_trigger_threshold:
+            self.get_logger().info(
+                f"Wysyłam cel Spin: {math.degrees(angle_error):.1f} stopni"
+            )
+            self.send_spin_goal(angle_error)
+            self.stopped = False
+
+    def send_spin_goal(self, angle):
+        goal_msg = Spin.Goal()
+        goal_msg.target_yaw = float(angle)
+
+        self.is_spinning = True
+
+        send_goal_future = self._action_client_spin.send_goal_async(goal_msg)
+        send_goal_future.add_done_callback(self.spin_response_callback)
+
+    def spin_response_callback(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().warn("Cel Spin odrzucony przez Nav2")
+            self.is_spinning = False
             return
 
-        angular_cmd = self.align_kp * angle_error
+        self.active_spin_handle = goal_handle
+        result_future = goal_handle.get_result_async()
+        result_future.add_done_callback(self.spin_result_callback)
 
-        # if angular_cmd > self.max_align_angular_speed:
-        #     angular_cmd = self.max_align_angular_speed
-        # elif angular_cmd < -self.max_align_angular_speed:
-        #     angular_cmd = -self.max_align_angular_speed
+    def spin_result_callback(self, future):
+        self.get_logger().info("Nav2 ukończył bezpieczny obrót bazy.")
+        self.is_spinning = False
+        self.active_spin_handle = None
 
-        # if 0.0 < angular_cmd < self.min_align_angular_speed:
-        #     angular_cmd = self.min_align_angular_speed
-        # elif -self.min_align_angular_speed < angular_cmd < 0.0:
-        #     angular_cmd = -self.min_align_angular_speed
-
-        twist_msg = Twist()
-        twist_msg.linear.x = 0.0
-        twist_msg.linear.y = 0.0
-        twist_msg.linear.z = 0.0
-        twist_msg.angular.x = 0.0
-        twist_msg.angular.y = 0.0
-        twist_msg.angular.z = angular_cmd
-        self.get_logger().info(f"Publikuje cmd: {angular_cmd:.3f}")
-        self.cmd_vel_pub.publish(twist_msg)
-        self.stopped = False
+    def cancel_spin_goal(self):
+        if self.active_spin_handle:
+            self.get_logger().info("Anuluję trwający obrót Spin")
+            self.active_spin_handle.cancel_goal_async()
+            self.active_spin_handle = None
+            self.is_spinning = False
 
     def center_target(self, x):
 

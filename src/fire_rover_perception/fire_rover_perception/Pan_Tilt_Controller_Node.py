@@ -4,6 +4,9 @@ import math
 from std_msgs.msg import Float64, String, Bool
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import Point
+from tf2_ros import TransformListener, Buffer
+from rclpy.time import Time
+from scipy.spatial.transform import Rotation as R
 
 
 class PanTiltControllerNode(Node):
@@ -39,14 +42,12 @@ class PanTiltControllerNode(Node):
 
         self.pan_position = 0.0
         self.target_state = "SEARCHING"
-        self.previous_target_state = "SEARCHING"
-        self.locked_pan_position = 0.0
-        # self.tilt_position = 0.0
         self.pan_step = 0.02
         self.lost_frames_count = 0
         self.max_lost_frames = 10
 
         self.current_pan_joint_position = 0.0
+        self.locked_pan_position = 0.0
         self.candidate_center_pan = 0.0
         self.candidate_half_range = math.radians(60.0)
         self.focused_half_range = math.radians(30.0)
@@ -56,8 +57,12 @@ class PanTiltControllerNode(Node):
         self.last_error_x = 0.0
         self.search_direction = 1
 
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.target_yaw_global = None
+
         # ZEGAR WYWOŁUJĄCY METODE
-        self.state_update = self.create_timer(0.1, self.machine_states)
+        self.state_update = self.create_timer(0.05, self.machine_states)
 
     # CALLBACKS
 
@@ -84,9 +89,7 @@ class PanTiltControllerNode(Node):
             "FOCUSED",
         ] and self.previous_target_state not in ["CANDIDATE", "FOCUSED"]:
             self.candidate_center_pan = self.current_pan_joint_position
-
             self.pan_position = self.current_pan_joint_position
-
             self.candidate_direction = 1 if self.last_error_x >= 0 else -1
 
         if (
@@ -94,6 +97,10 @@ class PanTiltControllerNode(Node):
             and self.previous_target_state != "CONFIRMED"
         ):
             self.locked_pan_position = self.current_pan_joint_position
+
+        if self.target_state == "SEARCHING":
+            self.target_yaw_global = None
+            self.candidate_center_pan = 0.0
 
     # STATES
     ## STATE TREE
@@ -132,80 +139,65 @@ class PanTiltControllerNode(Node):
         )
         self.send_data(self.pan_position)
 
+    def candidate_behavior(self):
+        self.get_logger().info("State: CANDIDATE (Global Stabilized + Search)")
+
+        robot_yaw = self.get_robot_yaw()
+        if robot_yaw is None:
+            return
+
+        # 1. Inicjalizacja przy pierwszym wykryciu
+        if self.target_yaw_global is None:
+            self.target_yaw_global = robot_yaw + self.current_pan_joint_position
+            self.get_logger().info("Lock-on! Azymut celu zapisany.")
+
+        # 2. Logika śledzenia i przeszukiwania
+        if self.weak_flag:
+            self.lost_frames_count = 0
+            # Precyzyjne dociąganie azymutu na mapie
+            pan_kp = 0.0008
+            if abs(self.last_error_x) > 50.0:
+                self.target_yaw_global += -self.last_error_x * pan_kp
+        else:
+            self.lost_frames_count += 1
+            # Jeśli straciliśmy cel na dłużej - zrób mały sweep wokół ostatniej pozycji
+            if self.lost_frames_count > self.max_lost_frames:
+                sweep_amplitude = math.radians(30.0)
+                sweep_offset = sweep_amplitude * math.sin(
+                    self.get_clock().now().nanoseconds / 1e9 * 2.0
+                )
+                current_search_yaw = self.target_yaw_global + sweep_offset
+            else:
+                current_search_yaw = self.target_yaw_global
+
+        # 3. Stabilizacja i publikacja
+        if not self.weak_flag and self.lost_frames_count > self.max_lost_frames:
+            self.pan_position = current_search_yaw - robot_yaw
+        else:
+            self.pan_position = self.target_yaw_global - robot_yaw
+
+        self.pan_position = (self.pan_position + math.pi) % (2 * math.pi) - math.pi
+        self.send_data(self.pan_position)
+
     def confirmed_behavior(self):
         self.get_logger().info("State: CONFIRMED")
         self.send_data(self.locked_pan_position)
 
-    def candidate_behavior(self):
-        self.get_logger().info("State: CANDIDATE")
-
-        if self.weak_flag:
-            self.lost_frames_count = 0
-
-            # P-regulator: zeruj korekcję w dead-zone, proporcjonalnie poza nią
-            pan_kp = 0.0008
-            if abs(self.last_error_x) < 50.0:
-                pan_correction = 0.0
-            else:
-                pan_correction = max(-0.02, min(0.02, self.last_error_x * pan_kp))
-
-            self.pan_position += pan_correction
-            self.candidate_center_pan = self.pan_position
-            self.get_logger().info(f"Pan correction: {pan_correction:.4f}")
-
-        else:
-            self.lost_frames_count += 1
-
-            # Daj YOLO chwilę — może cel mignie na 1-2 klatki
-            if self.lost_frames_count > self.max_lost_frames:
-                # Lokalny sweep wokół ostatniej znanej pozycji celu
-                min_pan = max(
-                    -math.pi, self.candidate_center_pan - self.candidate_half_range
-                )
-                max_pan = min(
-                    math.pi, self.candidate_center_pan + self.candidate_half_range
-                )
-                self.pan_position += self.pan_step * 0.25 * self.candidate_direction
-                if self.pan_position > max_pan:
-                    self.pan_position = max_pan
-                    self.candidate_direction = -1
-                elif self.pan_position < min_pan:
-                    self.pan_position = min_pan
-                    self.candidate_direction = 1
-                self.get_logger().info(
-                    f"Sweep lokalny: pos={self.pan_position:.3f}, dir={self.candidate_direction}"
-                )
-
-        self.send_data(self.pan_position)
-
     def focused_behavior(self):
         self.get_logger().info("State: FOCUSED")
-
         if self.weak_flag:
             self.lost_frames_count = 0
             pan_kp = 0.0005
             pan_correction = -self.last_error_x * pan_kp
-
             max_step = 0.05
-            if pan_correction > max_step:
-                pan_correction = max_step
-            elif pan_correction < -max_step:
-                pan_correction = -max_step
-
+            pan_correction = max(-max_step, min(max_step, pan_correction))
             self.pan_position += pan_correction
             self.candidate_center_pan = self.pan_position
-
         else:
-
             self.lost_frames_count += 1
-
             if self.lost_frames_count > self.max_lost_frames:
-                min_pan = max(
-                    -math.pi, self.candidate_center_pan - self.focused_half_range
-                )
-                max_pan = min(
-                    math.pi, self.candidate_center_pan + self.focused_half_range
-                )
+                min_pan = max(-math.pi, self.candidate_center_pan - self.focused_half_range)
+                max_pan = min(math.pi, self.candidate_center_pan + self.focused_half_range)
                 self.pan_position += self.pan_step * 0.15 * self.candidate_direction
                 if self.pan_position > max_pan:
                     self.pan_position = max_pan
@@ -213,14 +205,23 @@ class PanTiltControllerNode(Node):
                 elif self.pan_position < min_pan:
                     self.pan_position = min_pan
                     self.candidate_direction = 1
-            else:
-                pass
         self.send_data(self.pan_position)
 
     def send_data(self, position):
         msg = Float64()
         msg.data = position
         self.pan_pub.publish(msg)
+
+    def get_robot_yaw(self):
+        try:
+            now = Time()
+            transform = self.tf_buffer.lookup_transform("map", "base_footprint", now)
+            q = transform.transform.rotation
+            rot = R.from_quat([q.x, q.y, q.z, q.w])
+            _, _, yaw = rot.as_euler("xyz")
+            return yaw
+        except Exception as e:
+            return None
 
 
 def main(args=None):
