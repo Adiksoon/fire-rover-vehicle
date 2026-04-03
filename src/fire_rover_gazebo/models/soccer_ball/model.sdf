@@ -1,0 +1,42 @@
+<?xml version="1.0" ?>
+<sdf version="1.5">
+    <model name="soccer_ball">
+        <static>false</static>
+        <link name="soccer_ball_link">
+            <pose>0 0 0.1 0 0 0</pose>
+            <inertial>
+                <mass>0.026</mass>
+                <inertia>
+                    <ixx>1.664e-5</ixx>
+                    <iyy>1.664e-5</iyy>
+                    <izz>1.664e-5</izz>
+                    <ixy>0</ixy>
+                    <ixz>0</ixz>
+                    <iyz>0</iyz>
+                </inertia>
+            </inertial>
+            <collision name="collision">
+                <geometry>
+                    <sphere>
+                        <radius>0.1</radius>
+                    </sphere>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                    <mesh>
+                        <scale>0.1 0.1 0.1</scale>
+                        <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/robocup%203d%20simulation%20ball/3/files/meshes/ball.dae</uri>
+                    </mesh>
+                </geometry>
+            </visual>
+        </link>
+
+        <!-- Alternatywny plugin: Velocity Control -->
+        <plugin filename="ignition-gazebo-velocity-control-system" name="ignition::gazebo::systems::VelocityControl">
+            <initial_linear_velocity>0 0 0</initial_linear_velocity>
+            <initial_angular_velocity>0 0 0</initial_angular_velocity>
+        </plugin>
+
+    </model>
+</sdf>

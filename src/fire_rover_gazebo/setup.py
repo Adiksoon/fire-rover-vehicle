@@ -12,11 +12,13 @@ setup(
         ("share/" + package_name + "/launch", ["launch/sim.launch.py"]),
         ("share/" + package_name + "/launch", ["launch/sim.launch.py", "launch/rviz_balls.launch.py"]),
         ("share/" + package_name + "/worlds", ["worlds/lidar_test.world"]),
+        ("share/" + package_name + "/models/soccer_ball", ["models/soccer_ball/model.config", "models/soccer_ball/model.sdf"]),
         (
             "share/" + package_name + "/config",
             [
                 "config/slam.yaml",
                 "config/ekf.yaml",
+		"config/twist_mux.yaml",
             ],
         ),
     ],

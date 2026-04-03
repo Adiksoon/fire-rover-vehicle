@@ -1,7 +1,21 @@
 import os
+from ament_index_python.packages import get_package_share_directory
 
 os.environ["LD_LIBRARY_PATH"] = "/opt/ros/humble/lib"
 os.environ["QT_QPA_PLATFORM"] = "xcb"
+
+# Dodanie lokalnych modeli do ścieżki Gazebo
+pkg_share = get_package_share_directory("fire_rover_gazebo")
+models_path = os.path.join(pkg_share, "models")
+if "GZ_SIM_RESOURCE_PATH" in os.environ:
+    os.environ["GZ_SIM_RESOURCE_PATH"] += ":" + models_path
+else:
+    os.environ["GZ_SIM_RESOURCE_PATH"] = models_path
+
+if "IGN_GAZEBO_RESOURCE_PATH" in os.environ:
+    os.environ["IGN_GAZEBO_RESOURCE_PATH"] += ":" + models_path
+else:
+    os.environ["IGN_GAZEBO_RESOURCE_PATH"] = models_path
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, TimerAction
@@ -88,6 +102,7 @@ def generate_launch_description():
             "/camera/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo",
             "/pan_tilt/pan_cmd@std_msgs/msg/Float64]gz.msgs.Double",
             "/pan_tilt/tilt_cmd@std_msgs/msg/Float64]gz.msgs.Double",
+            "/ball_cmd_vel@geometry_msgs/msg/Twist]gz.msgs.Twist[/model/ball_back_side/cmd_vel",
         ],
         output="screen",
     )
@@ -115,6 +130,19 @@ def generate_launch_description():
         parameters=[slam_config],
     )
 
+    twist_mux_config = PathJoinSubstitution(
+        [FindPackageShare("fire_rover_gazebo"), "config", "twist_mux.yaml"]
+    )
+
+    twist_mux_node = Node(
+        package="twist_mux",
+        executable="twist_mux",
+        name="twist_mux",
+        output="screen",
+        parameters=[twist_mux_config],
+        remappings=[("/cmd_velout", "/cmd_vel")],
+    )
+
     pan_controller = Node(
         package="fire_rover_perception",
         executable="pan_tilt_controller_node",
@@ -132,7 +160,6 @@ def generate_launch_description():
         actions=[ekf_node, slam_node, pan_controller],
     )
 
-
     return LaunchDescription(
         [
             set_sim_time,
@@ -142,5 +169,6 @@ def generate_launch_description():
             robot_state_publisher,
             delayed_spawn,
             delayed_ekf_slam,
+            twist_mux_node,
         ]
     )

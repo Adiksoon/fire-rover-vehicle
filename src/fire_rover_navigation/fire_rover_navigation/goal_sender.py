@@ -59,6 +59,7 @@ class GoalSender(Node):
         # INICJALIZACJA
         self.get_logger().info("Czekam na serwer action... ")
         self._action_client.wait_for_server()
+        self._action_client_spin.wait_for_server()
 
         # INICJALIZACJA STANU ROBOTA
         self.current_goal = None
@@ -86,7 +87,6 @@ class GoalSender(Node):
         self.dead_zone_start = 0.26  # ~15 stopni (start ruchu bazy)
         self.pan_joint_angle = 0.0
         self.candidate_reference_angle = 0.0
-        self.alignment_active = False
 
         # Parametry dociągania bazy (Safe Spin)
         self.is_spinning = False
@@ -150,16 +150,6 @@ class GoalSender(Node):
             True if self.target_state in ["CANDIDATE", "FOCUSED"] else False
         )
 
-        if self.target_state in [
-            "CANDIDATE",
-            "FOCUSED",
-        ] and self.previous_target_state not in ["CANDIDATE", "FOCUSED"]:
-            self.candidate_start_time = self.get_clock().now()
-
-            if self.target_state not in ["CANDIDATE", "FOCUSED"]:
-                self.candidate_start_time = None
-                self.is_spinning = False
-
     def error_callback(self, msg):
 
         self.error_x = msg.x
@@ -168,7 +158,7 @@ class GoalSender(Node):
     def joint_states_callback(self, msg):
         if self.pan_joint_name in msg.name:
             idx = msg.name.index(self.pan_joint_name)
-            self.pan_joint_angle = msg.position[idx]
+            self.pan_joint_angle = -msg.position[idx]
 
     # MACHINE STATES
     def machine_states(self):
@@ -178,14 +168,13 @@ class GoalSender(Node):
 
             self.cancel_nav2_goal()
 
-            if self.alignment_active:
-                self.align_to_candidate_target()
-                self.get_logger().info("Obracam platformę w stronę celu")
-            else:
-                self.stop()
-                self.get_logger().info(
-                    "Zatrzymuję się; baza wózka zrównana prostopadle do celu! 🎯"
-                )
+            # if self.alignment_active:
+            #     self.align_to_candidate_target()
+            # else:
+            #     self.stop()
+            #     self.get_logger().info(
+            #         "Zatrzymuję się; baza wózka zrównana prostopadle do c#elu!  🎯"
+            #     )
 
         elif self.target_state == "CONFIRMED":
             self.stop()
@@ -205,7 +194,7 @@ class GoalSender(Node):
                     r_rot = R.from_quat([q.x, q.y, q.z, q.w])
                     _, _, robot_yaw = r_rot.as_euler("xyz")
 
-                    self.suspect_yaw = robot_yaw - self.pan_joint_angle
+                    self.suspect_yaw = robot_yaw + self.pan_joint_angle
                 except Exception as e:
                     self.get_logger().warn(f"TF wybuchło podczas szukania azymutu: {e}")
                     self.suspect_yaw = None
@@ -219,16 +208,23 @@ class GoalSender(Node):
     # STATES
 
     def align_to_candidate_target(self):
+        self.get_logger().info("Stan: ALIGNING TO CANDIDATE/FOCUSED TARGET")
+
         if not self.alignment_active or self.candidate_start_time is None:
+            self.get_logger().info(
+                "Nie można wyrównać - brak aktywnego celu lub czasu startu."
+            )
             return
 
         # Jeśli już się kręcimy, czekamy na wynik
         if self.is_spinning:
+            self.get_logger().info("Oczekuję na wynik obrotu Spin...")
             return
 
         # Sprawdź opóźnienie przed pierwszym ruchem
         elapsed = (self.get_clock().now() - self.candidate_start_time).nanoseconds / 1e9
         if elapsed < self.alignment_delay:
+            self.get_logger().info("czas przed ruchem")
             return
 
         angle_error = self.pan_joint_angle

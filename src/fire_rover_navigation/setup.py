@@ -10,7 +10,7 @@ setup(
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
     ],
-    install_requires=["setuptools", "ultralytics","torch"],
+    install_requires=["setuptools", "ultralytics", "torch"],
     zip_safe=True,
     maintainer="zygar",
     maintainer_email="adrianzygar@wp.pl",
@@ -24,6 +24,7 @@ setup(
     entry_points={
         "console_scripts": [
             "goal_sender = fire_rover_navigation.goal_sender:main",
+            "base_alignment_node = fire_rover_navigation.base_alignment_node:main",
         ],
     },
 )

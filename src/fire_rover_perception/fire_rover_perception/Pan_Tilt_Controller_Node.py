@@ -61,8 +61,18 @@ class PanTiltControllerNode(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
         self.target_yaw_global = None
 
-        # ZEGAR WYWOŁUJĄCY METODE
-        self.state_update = self.create_timer(0.05, self.machine_states)
+        # PID - Tuned for Pixel Error to Radian Delta
+        self.Kp_pan = 0.0003
+        self.Ki_pan = 0.00005
+        self.Kd_pan = 0.00008
+
+        self.integral_pan = 0.0
+        self.integral_max = 0.1  # Windup Guard (radians)
+        self.last_deviation_pan = 0.0
+        self.last_time = self.get_clock().now()
+
+        # ZEGAR WYWOŁUJĄCY METODE (20Hz)
+        self.state_update_timer = self.create_timer(0.05, self.machine_states)
 
     # CALLBACKS
 
@@ -75,7 +85,7 @@ class PanTiltControllerNode(Node):
     def joint_states_callback(self, msg):
         if self.pan_joint_name in msg.name:
             idx = msg.name.index(self.pan_joint_name)
-            self.current_pan_joint_position = msg.position[idx]
+            self.current_pan_joint_position = -msg.position[idx]
 
     def error_callback(self, msg):
         self.last_error_x = msg.x
@@ -140,8 +150,6 @@ class PanTiltControllerNode(Node):
         self.send_data(self.pan_position)
 
     def candidate_behavior(self):
-        self.get_logger().info("State: CANDIDATE (Global Stabilized + Search)")
-
         robot_yaw = self.get_robot_yaw()
         if robot_yaw is None:
             return
@@ -152,13 +160,20 @@ class PanTiltControllerNode(Node):
             self.get_logger().info("Lock-on! Azymut celu zapisany.")
 
         # 2. Logika śledzenia i przeszukiwania
-        if self.weak_flag:
+        if self.weak_flag or self.strong_flag:
+            self.get_logger().info("Cel widziany! Aktualizacja lock-on i PID...")
             self.lost_frames_count = 0
-            # Precyzyjne dociąganie azymutu na mapie
-            pan_kp = 0.0008
-            if abs(self.last_error_x) > 50.0:
-                self.target_yaw_global += -self.last_error_x * pan_kp
+            # Precyzyjne dociąganie azymutu na mapie przy użyciu PID
+            if abs(self.last_error_x) > 10.0:  # Mniejsza martwa strefa dla PID
+                pid_output = self.pid_control()
+                # Odejmujemy błąd wizyjny (jeśli cel jest na prawo, musimy obrócić kamerę w prawo)
+                self.target_yaw_global += -pid_output
         else:
+            self.get_logger().info(
+                "Cel zgubiony! Przechodzę w tryb poszukiwania lock-on..."
+            )
+            # Zerujemy całkę, gdy cel zgubiony, żeby uniknąć "pamięci" błędu po odnalezieniu
+            self.integral_pan = 0.0
             self.lost_frames_count += 1
             # Jeśli straciliśmy cel na dłużej - zrób mały sweep wokół ostatniej pozycji
             if self.lost_frames_count > self.max_lost_frames:
@@ -171,7 +186,11 @@ class PanTiltControllerNode(Node):
                 current_search_yaw = self.target_yaw_global
 
         # 3. Stabilizacja i publikacja
-        if not self.weak_flag and self.lost_frames_count > self.max_lost_frames:
+        if (
+            not self.weak_flag
+            and not self.strong_flag
+            and self.lost_frames_count > self.max_lost_frames
+        ):
             self.pan_position = current_search_yaw - robot_yaw
         else:
             self.pan_position = self.target_yaw_global - robot_yaw
@@ -196,8 +215,12 @@ class PanTiltControllerNode(Node):
         else:
             self.lost_frames_count += 1
             if self.lost_frames_count > self.max_lost_frames:
-                min_pan = max(-math.pi, self.candidate_center_pan - self.focused_half_range)
-                max_pan = min(math.pi, self.candidate_center_pan + self.focused_half_range)
+                min_pan = max(
+                    -math.pi, self.candidate_center_pan - self.focused_half_range
+                )
+                max_pan = min(
+                    math.pi, self.candidate_center_pan + self.focused_half_range
+                )
                 self.pan_position += self.pan_step * 0.15 * self.candidate_direction
                 if self.pan_position > max_pan:
                     self.pan_position = max_pan
@@ -209,7 +232,7 @@ class PanTiltControllerNode(Node):
 
     def send_data(self, position):
         msg = Float64()
-        msg.data = position
+        msg.data = -position
         self.pan_pub.publish(msg)
 
     def get_robot_yaw(self):
@@ -222,6 +245,41 @@ class PanTiltControllerNode(Node):
             return yaw
         except Exception as e:
             return None
+
+    def pid_control(self):
+        current_time = self.get_clock().now()
+        dt = (current_time - self.last_time).nanoseconds / 1e9
+        self.last_time = current_time
+
+        # Zabezpieczenie przed zbyt dużym dt (np. po przerwie w działaniu)
+        if dt > 0.1 or dt <= 0:
+            dt = 0.05
+
+        deviation = self.last_error_x
+
+        # Całka z Windup Guard
+        self.integral_pan += deviation * dt
+        self.integral_pan = (
+            max(
+                -self.integral_max / self.Ki_pan,
+                min(self.integral_max / self.Ki_pan, self.integral_pan),
+            )
+            if self.Ki_pan > 0
+            else 0.0
+        )
+
+        # Różniczka
+        derivative = (deviation - self.last_deviation_pan) / dt if dt > 0 else 0.0
+        self.last_deviation_pan = deviation
+
+        # Wyliczenie wyjścia PID
+        control_out = (
+            self.Kp_pan * deviation
+            + self.Ki_pan * self.integral_pan
+            + self.Kd_pan * derivative
+        )
+
+        return control_out
 
 
 def main(args=None):

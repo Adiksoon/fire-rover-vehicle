@@ -557,7 +557,7 @@
       <wheel_separation>0.1326219948931958</wheel_separation>
       <wheel_radius>0.0249</wheel_radius>
       <odom_publish_frequency>30</odom_publish_frequency>
-      <topic>/cmd_vel</topic>
+      <topic>cmd_vel</topic>
       <odom_topic>/odom</odom_topic>
       <tf_topic>/tf</tf_topic>
       <frame_id>odom</frame_id>
